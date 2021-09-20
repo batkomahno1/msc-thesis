@@ -189,6 +189,10 @@ class PGDAttack(Attack, LabelMixin):
             l1_sparsity=self.l1_sparsity,
         )
 
+        # TODO: DANGEROUS CLEANUP!
+        self.predict=None
+        torch.cuda.empty_cache()
+        
         return rval.data
 
 

@@ -63,7 +63,7 @@ for k,v in run_times.items():print(k,v,'m')
 sum(run_times.values())
 
 # Defaults: nb_sets = 2, nb_iter = 5, nb_pct = 2, nb_eps = 2, nb_types = 3
-nb_params = 3, 50, 2, 2, 3
+nb_params = 2, 50, 2, 2, 3
 get_runtime(run_times, *nb_params)
 
 # PARAMS TO USE TO MEASURE Time
