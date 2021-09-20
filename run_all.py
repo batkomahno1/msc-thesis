@@ -8,7 +8,7 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--nb_iter", type=int, default=1, help="number of iterations per experiment")
-parser.add_argument("--batch_size", type=int, default=512, help="size of the batches")
+parser.add_argument("--batch_size", type=int, default=2048, help="size of the batches")
 parser.add_argument("--verbose", type=lambda v: v=='True', default=False, help="verbose")
 parser.add_argument("--test", type=lambda v: v=='True', default=False, help="measure runtimes")
 opt = parser.parse_args()
@@ -16,8 +16,8 @@ opt = parser.parse_args()
 ITERATIONS = opt.nb_iter if not opt.test else 1
 BATCH_SIZE = opt.batch_size
 EXPERIMENTS = [
-                Experiment_WGAN(epochs=50, batch_size=BATCH_SIZE, verbose=opt.verbose), #100
-                Experiment_WGAN_GP(epochs=50, batch_size=BATCH_SIZE, verbose=opt.verbose), #100
+                Experiment_WGAN(epochs=100, batch_size=BATCH_SIZE, verbose=opt.verbose), #100
+                Experiment_WGAN_GP(epochs=100, batch_size=BATCH_SIZE, verbose=opt.verbose), #100
                 Experiment_CGAN(epochs=50, batch_size=BATCH_SIZE, verbose=opt.verbose), #50
                 Experiment_ACGAN(epochs=50, batch_size=BATCH_SIZE, verbose=opt.verbose) #50
                 ]
