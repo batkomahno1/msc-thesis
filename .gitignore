@@ -127,3 +127,23 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Project files/dirs to ignore
+cgan
+external/PyTorch-GAN/implementations/cgan/weights
+external/PyTorch-GAN/implementations/cgan/images
+
+acgan
+external/PyTorch-GAN/implementations/acgan/weights
+external/PyTorch-GAN/implementations/acgan/images
+
+wgan
+external/PyTorch-GAN/implementations/wgan/weights
+external/PyTorch-GAN/implementations/wgan/images
+
+wgan_gp
+external/PyTorch-GAN/implementations/wgan_gp/weights
+external/PyTorch-GAN/implementations/wgan_gp/images
+
+downloads
+download.sh

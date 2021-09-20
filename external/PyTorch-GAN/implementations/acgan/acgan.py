@@ -1,7 +1,11 @@
 import argparse
-import os
 import numpy as np
 import math
+
+# MULTI-GPU SUPPORT
+import os
+os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"]="0,1,2,3"
 
 import torchvision.transforms as transforms
 from torchvision.utils import save_image
@@ -13,6 +17,8 @@ from torch.autograd import Variable
 import torch.nn as nn
 import torch.nn.functional as F
 import torch
+
+
 
 os.makedirs("images", exist_ok=True)
 
@@ -28,11 +34,17 @@ parser.add_argument("--n_classes", type=int, default=10, help="number of classes
 parser.add_argument("--img_size", type=int, default=32, help="size of each image dimension")
 parser.add_argument("--channels", type=int, default=1, help="number of image channels")
 parser.add_argument("--sample_interval", type=int, default=400, help="interval between image sampling")
+# NOTE: I added this
+parser.add_argument("--data_path", type=str, default="../../data/mnist", help="data file")
+parser.add_argument("--target_path", type=str, default="../../data/mnist", help="target file")
+parser.add_argument("--output_id", type=str, default="", help="output identifier")
+parser.add_argument("--save_epochs", type=lambda v: v=='True', default=False, help="save weights each epoch")
+
 opt = parser.parse_args()
 print(opt)
 
 cuda = True if torch.cuda.is_available() else False
-
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def weights_init_normal(m):
     classname = m.__class__.__name__
@@ -116,27 +128,27 @@ auxiliary_loss = torch.nn.CrossEntropyLoss()
 generator = Generator()
 discriminator = Discriminator()
 
-if cuda:
-    generator.cuda()
-    discriminator.cuda()
-    adversarial_loss.cuda()
-    auxiliary_loss.cuda()
+# Move models and losses to device
+generator.to(device)
+discriminator.to(device)
+adversarial_loss.to(device)
+auxiliary_loss.to(device)
 
 # Initialize weights
 generator.apply(weights_init_normal)
 discriminator.apply(weights_init_normal)
 
-# Configure data loader
-os.makedirs("../../data/mnist", exist_ok=True)
+# Move models to parallel GPUs
+if torch.cuda.device_count() > 1:
+    print('Running on ', torch.cuda.device_count(), ' GPUs')
+    generator, discriminator = [nn.DataParallel(model) for model in [generator, discriminator]]
+
+# NOTE: I added this
+import torch.utils.data as data_utils
+dataset = data_utils.TensorDataset(torch.load(opt.data_path), torch.load(opt.target_path))
+
 dataloader = torch.utils.data.DataLoader(
-    datasets.MNIST(
-        "../../data/mnist",
-        train=True,
-        download=True,
-        transform=transforms.Compose(
-            [transforms.Resize(opt.img_size), transforms.ToTensor(), transforms.Normalize([0.5], [0.5])]
-        ),
-    ),
+    dataset,
     batch_size=opt.batch_size,
     shuffle=True,
 )
@@ -147,7 +159,6 @@ optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=opt.lr, betas=(opt
 
 FloatTensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
 LongTensor = torch.cuda.LongTensor if cuda else torch.LongTensor
-
 
 def sample_image(n_row, batches_done):
     """Saves a grid of generated digits ranging from 0 to n_classes"""
@@ -229,3 +240,16 @@ for epoch in range(opt.n_epochs):
         batches_done = epoch * len(dataloader) + i
         if batches_done % opt.sample_interval == 0:
             sample_image(n_row=10, batches_done=batches_done)
+
+    # NOTE: I added this
+    if opt.save_epochs:
+        os.makedirs("weights", exist_ok=True)
+        torch.save(discriminator.state_dict(), './weights/d_'+opt.output_id+'_epoch_'+str(epoch)+'.pth')
+        torch.save(generator.state_dict(), './weights/g_'+opt.output_id+'_epoch_'+str(epoch)+'.pth')
+
+os.makedirs("weights", exist_ok=True)
+name_d = './weights/d_'+opt.output_id+'_epoch_'+str(epoch)+'.pth'
+name_g = './weights/g_'+opt.output_id+'_epoch_'+str(epoch)+'.pth'
+
+torch.save(discriminator.state_dict(), name_d)
+torch.save(generator.state_dict(), name_g)

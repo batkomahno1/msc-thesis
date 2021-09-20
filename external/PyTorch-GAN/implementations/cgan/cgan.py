@@ -1,7 +1,11 @@
 import argparse
-import os
 import numpy as np
 import math
+
+# MULTI-GPU SUPPORT
+import os
+os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"]="0,1,2,3"
 
 import torchvision.transforms as transforms
 from torchvision.utils import save_image
@@ -28,13 +32,19 @@ parser.add_argument("--n_classes", type=int, default=10, help="number of classes
 parser.add_argument("--img_size", type=int, default=32, help="size of each image dimension")
 parser.add_argument("--channels", type=int, default=1, help="number of image channels")
 parser.add_argument("--sample_interval", type=int, default=400, help="interval between image sampling")
+# NOTE: I added this
+parser.add_argument("--data_path", type=str, default="../../data/mnist", help="data file")
+parser.add_argument("--target_path", type=str, default="../../data/mnist", help="target file")
+parser.add_argument("--output_id", type=str, default="", help="output identifier")
+parser.add_argument("--save_epochs", type=lambda v: v=='True', default=False, help="save weights each epoch")
+
 opt = parser.parse_args()
 print(opt)
 
 img_shape = (opt.channels, opt.img_size, opt.img_size)
 
 cuda = True if torch.cuda.is_available() else False
-
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class Generator(nn.Module):
     def __init__(self):
@@ -98,22 +108,22 @@ adversarial_loss = torch.nn.MSELoss()
 generator = Generator()
 discriminator = Discriminator()
 
-if cuda:
-    generator.cuda()
-    discriminator.cuda()
-    adversarial_loss.cuda()
+# Move models and losses to device
+generator.to(device)
+discriminator.to(device)
+adversarial_loss.to(device)
 
-# Configure data loader
-os.makedirs("../../data/mnist", exist_ok=True)
+# Move models to parallel GPUs
+if torch.cuda.device_count() > 1:
+    print('Running on ', torch.cuda.device_count(), ' GPUs')
+    generator, discriminator = [nn.DataParallel(model) for model in [generator, discriminator]]
+
+# NOTE: I added this
+import torch.utils.data as data_utils
+dataset = data_utils.TensorDataset(torch.load(opt.data_path), torch.load(opt.target_path))
+
 dataloader = torch.utils.data.DataLoader(
-    datasets.MNIST(
-        "../../data/mnist",
-        train=True,
-        download=True,
-        transform=transforms.Compose(
-            [transforms.Resize(opt.img_size), transforms.ToTensor(), transforms.Normalize([0.5], [0.5])]
-        ),
-    ),
+    dataset,
     batch_size=opt.batch_size,
     shuffle=True,
 )
@@ -134,6 +144,7 @@ def sample_image(n_row, batches_done):
     labels = np.array([num for _ in range(n_row) for num in range(n_row)])
     labels = Variable(LongTensor(labels))
     gen_imgs = generator(z, labels)
+    print(gen_imgs.shape)
     save_image(gen_imgs.data, "images/%d.png" % batches_done, nrow=n_row, normalize=True)
 
 
@@ -202,3 +213,16 @@ for epoch in range(opt.n_epochs):
         batches_done = epoch * len(dataloader) + i
         if batches_done % opt.sample_interval == 0:
             sample_image(n_row=10, batches_done=batches_done)
+
+    # NOTE: I added this
+    if opt.save_epochs:
+        os.makedirs("weights", exist_ok=True)
+        torch.save(discriminator.state_dict(), './weights/d_'+opt.output_id+'_epoch_'+str(epoch)+'.pth')
+        torch.save(generator.state_dict(), './weights/g_'+opt.output_id+'_epoch_'+str(epoch)+'.pth')
+
+os.makedirs("weights", exist_ok=True)
+name_d = './weights/d_'+opt.output_id+'_epoch_'+str(epoch)+'.pth'
+name_g = './weights/g_'+opt.output_id+'_epoch_'+str(epoch)+'.pth'
+
+torch.save(discriminator.state_dict(), name_d)
+torch.save(generator.state_dict(), name_g)

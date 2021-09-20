@@ -29,7 +29,7 @@ from .base import LabelMixin
 from .utils import rand_init_delta
 
 
-def perturb_iterative(xvar, yvar, predict, nb_iter, eps, eps_iter, loss_fn,
+def perturb_iterative(xvar, yvar, labels, predict, nb_iter, eps, eps_iter, loss_fn,
                       delta_init=None, minimize=False, ord=np.inf,
                       clip_min=0.0, clip_max=1.0,
                       l1_sparsity=None):
@@ -62,8 +62,9 @@ def perturb_iterative(xvar, yvar, predict, nb_iter, eps, eps_iter, loss_fn,
 
     delta.requires_grad_()
     for ii in range(nb_iter):
-        outputs = predict(xvar + delta)
-        loss = loss_fn(outputs, yvar)
+        # changed this so that predict and loss recieve all possible inputs
+        outputs = predict(xvar + delta, labels)
+        loss = loss_fn(outputs, yvar, labels)
         if minimize:
             loss = -loss
 
@@ -157,7 +158,7 @@ class PGDAttack(Attack, LabelMixin):
         assert is_float_or_torch_tensor(self.eps_iter)
         assert is_float_or_torch_tensor(self.eps)
 
-    def perturb(self, x, y=None):
+    def perturb(self, x, y=None, labels=None):
         """
         Given examples (x, y), returns their adversarial counterparts with
         an attack length of eps.
@@ -180,7 +181,7 @@ class PGDAttack(Attack, LabelMixin):
                 x + delta.data, min=self.clip_min, max=self.clip_max) - x
 
         rval = perturb_iterative(
-            x, y, self.predict, nb_iter=self.nb_iter,
+            x, y, labels, self.predict, nb_iter=self.nb_iter,
             eps=self.eps, eps_iter=self.eps_iter,
             loss_fn=self.loss_fn, minimize=self.targeted,
             ord=self.ord, clip_min=self.clip_min,
