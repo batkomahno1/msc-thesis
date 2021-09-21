@@ -1,11 +1,14 @@
+# MULTI-GPU SUPPORT
+import os, json
+with open('/tmp/gpus.json', 'r') as f:
+    gpus = json.load(f)
+    if len(gpus) > 1:
+        os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+        os.environ["CUDA_VISIBLE_DEVICES"]=str(gpus)
+        
 import argparse
 import numpy as np
 import math
-
-# MULTI-GPU SUPPORT
-import os
-os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"]="0,1,2,3"
 
 import torchvision.transforms as transforms
 from torchvision.utils import save_image

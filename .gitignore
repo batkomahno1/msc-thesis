@@ -147,3 +147,6 @@ external/PyTorch-GAN/implementations/wgan_gp/images
 
 downloads
 download.sh
+
+tmp
+gpus.pkl

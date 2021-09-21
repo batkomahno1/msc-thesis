@@ -1,3 +1,12 @@
+# MULTI-GPU SUPPORT
+import os, json
+with open('/tmp/gpus.json', 'r') as f:
+    gpus = json.load(f)
+    if len(gpus) > 1:
+        os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+        os.environ["CUDA_VISIBLE_DEVICES"]=str(gpus)
+        print('GPUs ', os.environ["CUDA_VISIBLE_DEVICES"])
+
 import torch
 import torch.nn as nn
 
@@ -16,12 +25,6 @@ import importlib.util
 import shutil
 import logging
 import inspect
-
-# MULTI-GPU SUPPORT
-import os
-os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"]="0,1,2,3"
-
 
 # TODO: this is a very hack way to import this libarry
 sys.path.append(os.path.join(os.getcwd(), 'external/advertorch'))
@@ -85,13 +88,13 @@ class Experiment(abc.ABC):
         self.DATA_DIR = OUTPUT + self.GAN_NAME + '/data/'
         self.GAN_DIR = self.DIR + 'external/PyTorch-GAN/implementations/'+self.GAN_NAME+'/'
         self.GAN_WEIGHTS_DIR = self.GAN_DIR + 'weights/'
-        self.GAN_ARCHS_DIR = self.DIR + '/gan_archs/'
+        self.GAN_ARCHS_DIR = self.DIR + 'gan_archs/'
         self.TEST_MODELS_DIR = self.DIR + 'test_models/'
         self.RESULTS = OUTPUT + self.GAN_NAME + '/results/'
-
-        self.data_path = self.DATA_DIR + 'data_' + OUTPUT_ID + '.pt'
-        self.targets_path = self.DATA_DIR + 'targets_' + OUTPUT_ID + '.pt'
-        self.idxs_path = self.DATA_DIR + 'idxs_' + OUTPUT_ID + '.pt'
+        self.TMP_DIR = self.DIR + 'tmp/'
+        self.TEMP_DATA_PATH = self.TMP_DIR + 'data_adv.pt'
+        self.TEMP_TARGETS_PATH = self.TMP_DIR + 'targets_adv.pt'
+        self.CLN_IMGS_DIR, self.ADV_IMGS_DIR = 'tmp/cln_imgs', 'tmp/adv_imgs'
 
         self.gan_g_path = self.GAN_WEIGHTS_DIR + 'g_' + OUTPUT_ID + '_epoch_{}.pth'
         self.gan_d_path = self.GAN_WEIGHTS_DIR + 'd_' + OUTPUT_ID + '_epoch_{}.pth'
@@ -101,11 +104,19 @@ class Experiment(abc.ABC):
         MNIST_CNN_PATH = self.TEST_MODELS_DIR + 'main.py'# TODO: rename with self
         MNIST_CNN_W_PATH = self.TEST_MODELS_DIR + 'mnist_weights.pt'# TODO: rename with self
 
+        dirs = [
+        self.DATA_DIR, self.GAN_WEIGHTS_DIR, self.TEST_MODELS_DIR, self.RESULTS, \
+        self.TMP_DIR, self.CLN_IMGS_DIR, self.ADV_IMGS_DIR
+        ]
 
         # safely create working dirs
-        for directory in [self.DATA_DIR, self.GAN_WEIGHTS_DIR, self.TEST_MODELS_DIR, self.RESULTS]:
+        for directory in dirs:
             if not os.path.exists(directory):
                 os.makedirs(directory)
+
+        self.data_path = self.DATA_DIR + 'data_' + OUTPUT_ID + '.pt'
+        self.targets_path = self.DATA_DIR + 'targets_' + OUTPUT_ID + '.pt'
+        self.idxs_path = self.DATA_DIR + 'idxs_' + OUTPUT_ID + '.pt'
 
         # init data
         self.data = None
@@ -174,6 +185,12 @@ class Experiment(abc.ABC):
 
         self.data, self.targets, self.classes = data, targets, classes
 
+    def _data_to_CPU(self):
+        self.data, self.targets = [v.detach().cpu() for v in [self.data, self.targets]]
+
+    def _data_to_GPU(self):
+        self.data, self.targets = [v.to(self.DEVICE) for v in [self.data, self.targets]]
+
     def _init_gan_models(self, img_shape):
         # TODO: make D and G names arch dependent!
         path = self.GAN_ARCHS_DIR + self.GAN_NAME + '.py'
@@ -239,7 +256,7 @@ class Experiment(abc.ABC):
         output = self.G_decorator(G)(noise, kwargs).detach().cpu()
 
         #clean up
-        G=G.cpu(); del G
+        G=G.cpu(); del G, noise
 
         return output
 
@@ -282,7 +299,7 @@ class Experiment(abc.ABC):
             logging.info(f'Targeting attack at class {tgt_class} - {len(idxs_small_part)} samples')
 
         # set targets
-        y = self.FloatTensor(self.data.shape[0], 1).fill_(0.0)
+        y = self.FloatTensor(self.data.shape[0], 1).fill_(0.0).to(self.DEVICE)
         if 'noise' in note.lower():
             self.data[idxs_small_part] = torch.rand_like(self.data[:idxs_small_part.shape[0]])
             y[idxs_small_part] = 1.0
@@ -291,7 +308,7 @@ class Experiment(abc.ABC):
             self.data[idxs_small_part] = self._generate(n, dataset, 0, itr=0, epoch=epoch, labels=labels)
             y[idxs_small_part] = 1.0
             # clean up
-            del labels
+            labels=labels.cpu(); del labels
         elif 'downgrade'  in note.lower():
             y[idxs_small_part] = 0
         else:
@@ -305,39 +322,64 @@ class Experiment(abc.ABC):
         adv = LinfPGDAttack(D, loss_fn=self.loss, clip_min=-1.0, clip_max=1.0, eps=eps, \
                             eps_iter=0.01, nb_iter=100, targeted=targeted)
 
+        # copy samples
+        X, labels = [v[idxs_small_part].detach().clone().to(self.DEVICE) for \
+                                                            v in [self.data, self.targets]]
+
         # attack samples
         if eps > 0:
-            self.data[idxs_small_part] = adv.perturb(self.data[idxs_small_part].to(self.DEVICE),
-                                                        y=y[idxs_small_part].to(self.DEVICE),
-                                                        labels=self.targets[idxs_small_part].to(self.DEVICE)
-                                                        ).detach().cpu()
+             X = adv.perturb(X, y=y[idxs_small_part], labels=labels).detach().clone().cpu()
+             labels = labels.detach().clone().cpu()
 
         # save perturbed samples for GAN poisoning
-        torch.save(self.data, self.data_path.format(c, pct, itr))
-        torch.save(self.targets, self.targets_path.format(c, pct, itr))
+        torch.save(X, self.data_path.format(c, pct, itr))
+        torch.save(labels, self.targets_path.format(c, pct, itr))
         torch.save(idxs_small_part, self.idxs_path.format(c, pct, itr))
 
         # clean up
-        D0=D0.cpu();del adv, D, D0, y
+        self._data_to_CPU()
+        D0=D0.cpu();del adv, D, D0, X, y, labels
         torch.cuda.empty_cache()
 
         # log
         logging.info(f'Processed atk:{c} pct {pct} time {(time.time()-start):0.0f}s')
 
+    def _load_adv_data(self, p, itr=0):
+        """Return data and targets containing adv samples."""
+        c, pct  = get_hyper_param(p)
+        # get idxs of adv samples
+        idxs = torch.load(self.idxs_path.format(c, pct, itr))
+        # copy clean data
+        X, y = [v.detach().clone() for v in [self.data, self.targets]]
+        # assgining adv samples
+        X[idxs] = torch.load(self.data_path.format(c, pct, itr))
+        y[idxs] = torch.load(self.targets_path.format(c, pct, itr))
+        return X, y
+
     def _build_gan(self, p, itr=0, save=False):
         # TODO: use subprocess.check_output instead
         start = time.time()
         c, pct = get_hyper_param(p)
-        # run the GAN on psned samples
 
+        # check if this is a cln build
+        if isinstance(p, str):
+            # copy samples
+            X_path, y_path = [v.format(c, pct, itr) for v in [self.data_path, self.targets_path]]
+        else:
+            X, y = self._load_adv_data(p,itr=itr)
+            torch.save(X, self.TEMP_DATA_PATH)
+            torch.save(y, self.TEMP_TARGETS_PATH)
+            X_path, y_path = self.TEMP_DATA_PATH, self.TEMP_TARGETS_PATH
+
+        # run the GAN on psned samples
         proc = subprocess.run(["python3", self.GAN_NAME + ".py",
-                               "--target_path=" + self.targets_path.format(c,pct,itr),
+                               "--target_path=" + y_path,
                                "--img_size=" + str(self.IMG_SHAPE[-1]),
                                "--batch_size=" + str(self.BATCH_SIZE),
                                "--n_epochs=" + str(self.EPOCHS),
                                "--output_id=" + OUTPUT_ID.format(c,pct,itr),
                                "--save_epochs=" + str(save),
-                               "--data_path=" + self.data_path.format(c,pct,itr)],
+                               "--data_path=" + X_path],
                               # capture_output=True,
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                               cwd = self.GAN_DIR)
@@ -355,39 +397,35 @@ class Experiment(abc.ABC):
         idxs_big_part = np.array(list(set(range(self.data.shape[0])) - set(idxs_small_part)))
 
         #load psnd data and targets
-        X = torch.load(self.data_path.format(c,pct,itr)).to(self.DEVICE)
+        X, y = [v.to(self.DEVICE) for v in self._load_adv_data(p,itr=itr)]
+        self._data_to_GPU()
 
         # make plots
         if idxs_small_part.shape[0]>0:
             preds_small = self._discriminate(X[idxs_small_part], dataset, 0, itr=itr, \
-                                                    epoch=epoch, labels=self.targets[idxs_small_part])
-            plt.hist(preds_small, alpha=0.5, label='small part')
+                                                    epoch=epoch, labels=y[idxs_small_part])
+            plt.hist(preds_small, alpha=0.5, label='X adv')
         if idxs_big_part.shape[0]>0:
-            preds_big = self._discriminate(X[idxs_big_part], dataset, 0, itr=itr, \
-                                                    epoch=epoch, labels=self.targets[idxs_big_part])
-            plt.hist(preds_big, alpha=0.5, label='big part')
+            preds_big = self._discriminate(self.data[idxs_small_part], dataset, 0, itr=itr, \
+                                                    epoch=epoch, labels=self.targets[idxs_small_part])
+            plt.hist(preds_big, alpha=0.5, label='X cln')
         plt.legend()
         # plt.title(p)
         plt.savefig(self.RESULTS + 'victim_d_and_adv_samples' + str(p) + '_itr_' + str(itr) + '.svg')
         plt.close()
 
         # remove from GPU!
-        X = X.detach().cpu()
-        del X
+        self._data_to_CPU()
+        X,y = [v.detach().cpu() for v in [X,y]]
+        del X,y
 
     def _visualize_samples(self, p, itr=0):
         # save images of adv samples
         c, pct = get_hyper_param(p)
-        X = torch.load(self.data_path.format(c,pct,itr))
+        X, _ = self._load_adv_data(p,itr=itr)
         idxs = torch.load(self.idxs_path.format(c,pct,itr))
         name = self.RESULTS + OUTPUT_ID.format(c, pct, itr)+'.png'
         save_image(X[idxs][:25], name, nrow=5, normalize=True)
-
-    def _delete_samples(self, p, itr=0):
-        c, pct = get_hyper_param(p)
-        paths = (v.format(c, pct, itr) for v in [self.data_path, self.targets_path, self.idxs_path])
-        for path in paths:
-            if os.path.isfile(path): os.remove(path)
 
     def _check_gan(self, p, itr=0, epoch=None):
         if epoch is None: epoch = self.EPOCHS-1
@@ -416,7 +454,7 @@ class Experiment(abc.ABC):
         assert len(idxs) == labels.shape[0]
 
         # TODO: MAKE THESE A CLASS CONSTANT
-        paths = 'tmp/cln_imgs', 'tmp/adv_imgs'
+        paths = self.CLN_IMGS_DIR, self.ADV_IMGS_DIR
         for path in paths:
             if os.path.exists(path):
                 shutil.rmtree(path)
@@ -427,8 +465,10 @@ class Experiment(abc.ABC):
             save_image(z_adv[i], f'{paths[1]}/adv_{i}.png')
 
         # don't need vars stored in GPU memory anymore, release them!
+        self._data_to_CPU()
+        del z_adv, matching, idxs
+
         ## TODO: THIS IS DESPERATE!! CHECK THE CONSEQUENCES!
-        del self.data, self.targets
         torch.cuda.empty_cache()
 
         proc = subprocess.run(["python3",'-m','pytorch_fid','--device',self.DEVICE,

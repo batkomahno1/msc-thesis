@@ -19,3 +19,21 @@ exp.run(p)
 
 exp =  Experiment_ACGAN(epochs=1, verbose=True)
 exp.run(p)
+
+import torch
+available_gpus = [torch.cuda.device(i) for i in range(torch.cuda.device_count())]
+available_gpus
+
+>>> torch.cuda.list_gpu_processes(1)
+'GPU:1\nprocess    3356686 uses    48235.000 MB GPU memory'
+
+import json
+with open('/tmp/data.json', 'w') as f:
+  json.dump([1,2,3], f, ensure_ascii=False)
+
+import json
+with open('/tmp/data.json', 'r') as f:
+    var = json.load(f)
+
+var
+type(var)
