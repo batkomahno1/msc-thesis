@@ -4,8 +4,8 @@ with open('/tmp/gpus.json', 'r') as f:
     gpus = json.load(f)
     if len(gpus) > 1:
         os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-        os.environ["CUDA_VISIBLE_DEVICES"]=str(gpus)
-        
+        os.environ["CUDA_VISIBLE_DEVICES"]=','.join(str(i) for i in gpus)
+
 import argparse
 import numpy as np
 import math
