@@ -16,13 +16,14 @@ parser.add_argument("--nb_gpus", type=int, default=4, help="number of gpus to be
 opt = parser.parse_args()
 
 # find available GPUs
-import torch, json
-gpus_available = [0]
+import torch, json, subprocess
+import numpy as np
+proc = subprocess.check_output(['nvidia-smi', '--query-gpu=memory.used', '--format=csv,nounits,noheader','--filename=/tmp/cuda.csv'])
+mem_used = np.loadtxt('/tmp/cuda.csv',dtype=int)
 sys_gpus = torch.cuda.device_count()
 gpus_available = [0]
 if sys_gpus > 1:
-    gpu_procs = [torch.cuda.list_gpu_processes(i) for i in range(opt.nb_gpus)]
-    gpus_available = [i for i, p in enumerate(gpu_procs) if 'no processes are running' in p]
+    gpus_available = [i for i in range(opt.nb_gpus) if mem_used[i] < 4]
 with open('/tmp/gpus.json', 'w') as f:
   json.dump(gpus_available, f, ensure_ascii=False)
 
