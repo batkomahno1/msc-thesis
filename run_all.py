@@ -22,7 +22,7 @@ sys_gpus = torch.cuda.device_count()
 gpus_available = [0]
 if sys_gpus > 1:
     gpu_procs = [torch.cuda.list_gpu_processes(i) for i in range(sys_gpus)]
-    gpus_available = [i for i, p in enumerate(procs) if 'no processes are running' in p][:opt.nb_gpus]
+    gpus_available = [i for i, p in enumerate(gpu_procs) if 'no processes are running' in p][:opt.nb_gpus]
 with open('/tmp/gpus.json', 'w') as f:
   json.dump(gpus_available, f, ensure_ascii=False)
 
