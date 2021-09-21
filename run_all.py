@@ -5,6 +5,12 @@ import time
 import os
 import pickle
 import argparse
+import logging
+
+# start logging
+logging.basicConfig(filename='experiment.log', level=logging.INFO)
+logging.info(time.asctime())
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--nb_iter", type=int, default=1, help="number of iterations per experiment")
@@ -16,8 +22,8 @@ opt = parser.parse_args()
 ITERATIONS = opt.nb_iter if not opt.test else 1
 BATCH_SIZE = opt.batch_size
 EXPERIMENTS = [
-                Experiment_WGAN(epochs=100, batch_size=BATCH_SIZE, verbose=opt.verbose), #100
-                Experiment_WGAN_GP(epochs=100, batch_size=BATCH_SIZE, verbose=opt.verbose), #100
+                Experiment_WGAN(epochs=50, batch_size=BATCH_SIZE, verbose=opt.verbose), #100
+                Experiment_WGAN_GP(epochs=50, batch_size=BATCH_SIZE, verbose=opt.verbose), #100
                 Experiment_CGAN(epochs=50, batch_size=BATCH_SIZE, verbose=opt.verbose), #50
                 Experiment_ACGAN(epochs=50, batch_size=BATCH_SIZE, verbose=opt.verbose) #50
                 ]
@@ -53,6 +59,12 @@ for itr in range(ITERATIONS):
         gan_name = exp.GAN_NAME
         arch_family = [k for k,v in ARCH_FAMILIES.items() if gan_name in v][0]
         for params in PARAM_SET[arch_family]:
+            # omit duplicate clean gan
+            eps, note = params[3], params[-1]
+            if 'downgrade'==note.lower() and eps==0.0:
+                logging.info(f'Experiment {params} skipped!.')
+                continue
+
             start = time.time()
             fid = exp.run(params, itr=itr)
             result[(gan_name, params, itr)] = fid, time.time()-start

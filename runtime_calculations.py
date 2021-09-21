@@ -22,9 +22,18 @@ from os.path import isfile, join
 import pickle5 as pickle
 path = 'downloads/'
 files = [f for f in listdir(path) if isfile(join(path, f)) if 'run' in f]
-files.sort()
-file = path+files[-1]
-file
+menu = {i:f for i,f in enumerate(files)}
+
+try:
+    choice = int(input(f'Choose file: {menu}'))
+except ValueError:
+    print("Not a number")
+
+if choice > len(files) or choice < 0: raise ValueError('Wrong file choice.')
+print('Loading: ', files[choice])
+
+file = path+files[choice]
+# file
 
 with open(file, 'rb') as f:
     res = pickle.load(f)
@@ -34,7 +43,7 @@ with open(file, 'rb') as f:
 
 from statistics import mean
 
-res
+# res
 
 times = dict()
 for gan in set(v[0] for v in res.keys()):
@@ -44,9 +53,9 @@ for gan in set(v[0] for v in res.keys()):
 
 assert len(times.keys()) == len(set(times.keys()))
 
-times
+# times
 
-[[k, mean(v)//60] for k,v in times.items()]
+# [[k, mean(v)//60] for k,v in times.items()]
 
 # WASSERSTEIN GANS
 DATASET=('mnist','fmnist',)
@@ -57,14 +66,14 @@ TARGETED=(True,)
 ATK = ('inf',)
 NOTE=('earlyStop','noise','downgrade',)
 
-run_times= {k[0]:mean(v)//60 for k,v in times.items()}
-for k,v in run_times.items():print(k,v,'m')
-
-sum(run_times.values())
+run_times= {k[0]:round(mean(v)/60)/4 for k,v in times.items()}
+run_times['wgan']/=2; run_times['wgan_gp']/=2
 
 # Defaults: nb_sets = 2, nb_iter = 5, nb_pct = 2, nb_eps = 2, nb_types = 3
-nb_params = 2, 50, 2, 2, 3
+nb_params = 3, 50, 2, 2, 3
 get_runtime(run_times, *nb_params)
+
+sum([round(2*2*2*3*4*t/60) for t in run_times.values()])*50//24
 
 # PARAMS TO USE TO MEASURE Time
 # WASSERSTEIN GANS

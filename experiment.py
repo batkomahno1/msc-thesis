@@ -63,11 +63,6 @@ class Experiment(abc.ABC):
         # don't need vars stored in GPU memory anymore, release them!
         torch.cuda.empty_cache()
 
-        # TODO: THIS SHOULDN'T START EVERYTIME AN OBJECT IS CREATED
-        # start logging
-        logging.basicConfig(filename='experiment.log', level=logging.INFO)
-        logging.info(time.asctime())
-
         #setup GPUs
         self.USE_GPU = use_gpu
         cuda = self.USE_GPU and torch.cuda.is_available()
@@ -279,7 +274,7 @@ class Experiment(abc.ABC):
         if tgt_class == -1:
             nb_samples = int(pct/100*self.data.shape[0])
             idxs_small_part = np.random.choice(np.arange(self.data.shape[0]), nb_samples, replace=False)
-            logging.info(f'Targeting attack at whole set - {len(idxs_small_part)} samples')
+            logging.info(f'Indiscriminate attack - {len(idxs_small_part)} samples')
         else:
             idxs = to_numpy_squeeze(torch.where(self.targets==tgt_class)[0])
             nb_samples = int(pct/100*idxs.shape[0])
@@ -308,7 +303,7 @@ class Experiment(abc.ABC):
 
         # set up the atk
         adv = LinfPGDAttack(D, loss_fn=self.loss, clip_min=-1.0, clip_max=1.0, eps=eps, \
-                            eps_iter=0.01, nb_iter=1000, targeted=targeted)
+                            eps_iter=0.01, nb_iter=100, targeted=targeted)
 
         # attack samples
         if eps > 0:
@@ -394,6 +389,12 @@ class Experiment(abc.ABC):
         for path in paths:
             if os.path.isfile(path): os.remove(path)
 
+    def _check_gan(self, p, itr=0, epoch=None):
+        if epoch is None: epoch = self.EPOCHS-1
+        c, pct = get_hyper_param(p)
+        file = self.gan_g_path.format(c,pct,itr,epoch)
+        return os.path.isfile(file)
+
     def _measure_FID(self, p, itr=0, nb_samples=2048):
         start = time.time()
         c, pct = get_hyper_param(p)
@@ -437,7 +438,7 @@ class Experiment(abc.ABC):
                                 cwd = '.')
         proc.check_returncode()
         fid = float(proc.stdout.decode('utf-8').split()[-1])
-        logging.info(f'FID={fid} for {p}_itr_{itr} {(time.time()-start)//60}m')
+        logging.info(f'FID={fid} for {p}_itr_{itr} {(time.time()-start):0.0f}s')
         return fid
 
     def run(self, params, itr=0):
@@ -458,8 +459,9 @@ class Experiment(abc.ABC):
 
         # build clean gan
         # TODO: CHECK STORAGE CONSUMPTION!!
-        self._build_gan(dataset, itr=itr, save=True)
-        if self.verbose: print('Clean GAN built')
+        if not self._check_gan(dataset, itr=itr, epoch=None):
+            self._build_gan(dataset, itr=itr, save=True)
+            if self.verbose: print('Clean GAN built')
 
         # init GAN models
         self._init_gan_models(self.IMG_SHAPE)
