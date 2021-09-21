@@ -1,5 +1,14 @@
 from statistics import mean
 
+def get_storage(nb_sets = 2, nb_iter = 5, nb_pct = 2, nb_eps = 2, nb_types = 3):
+    nb_archs = 4
+    gans = ['cgan','acgan','wgan','wgan_gp']
+    mb = 256
+    iter_per_gan = nb_archs*nb_eps*nb_pct*nb_sets*nb_types
+    print("GB per exp: ", iter_per_gan*256//1024)
+    print("Total GB: ", nb_iter*iter_per_gan*256//1024)
+
+
 def get_runtime(run_times=None, nb_sets = 2, nb_iter = 5, nb_pct = 2, nb_eps = 2, nb_types = 3):
     nb_archs = 4
     if run_times is None:
@@ -15,7 +24,6 @@ def get_runtime(run_times=None, nb_sets = 2, nb_iter = 5, nb_pct = 2, nb_eps = 2
     print('Time per GAN per iter: ', tot_run_times, 'hours')
     print('Time per exp per itr', sum(tot_run_times.values())//1, 'hours')
     print('Total', sum(tot_run_times.values())*nb_iter//24, 'days')
-
 
 from os import listdir
 from os.path import isfile, join
@@ -66,12 +74,16 @@ TARGETED=(True,)
 ATK = ('inf',)
 NOTE=('earlyStop','noise','downgrade',)
 
-run_times= {k[0]:round(mean(v)/60)/4 for k,v in times.items()}
+run_times= {k[0]:round(mean(v)/60)/2 for k,v in times.items()}
 run_times['wgan']/=2; run_times['wgan_gp']/=2
 
 # Defaults: nb_sets = 2, nb_iter = 5, nb_pct = 2, nb_eps = 2, nb_types = 3
-nb_params = 3, 50, 2, 2, 3
+nb_params = 2, 20, 2, 2, 3
 get_runtime(run_times, *nb_params)
+
+get_storage(*nb_params)
+
+480/2*0.2+480/2*0.1
 
 sum([round(2*2*2*3*4*t/60) for t in run_times.values()])*50//24
 
