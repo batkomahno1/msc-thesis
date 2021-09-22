@@ -18,14 +18,16 @@ opt = parser.parse_args()
 # find available GPUs
 import torch, json, subprocess
 import numpy as np
-proc = subprocess.check_output(['nvidia-smi', '--query-gpu=memory.used', '--format=csv,nounits,noheader','--filename=/tmp/cuda.csv'])
-mem_used = np.loadtxt('/tmp/cuda.csv',dtype=int)
+cmd = ['nvidia-smi', '--query-gpu=memory.used', '--format=csv,nounits,noheader']
+proc = subprocess.check_output(cmd)
+gpu_mem = [int(v) for v in proc.decode('utf-8').replace('\n', ' ').split()]
 sys_gpus = torch.cuda.device_count()
 gpus_available = [0]
 if sys_gpus > 1:
-    gpus_available = [i for i in range(opt.nb_gpus) if mem_used[i] < 4]
-with open('/tmp/gpus.json', 'w') as f:
-  json.dump(gpus_available, f, ensure_ascii=False)
+    gpus = range(min(opt.nb_gpus, sys_gpus))
+    gpus_available = [i for i in gpus if mem_used[i] < 4]
+os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
+os.environ["CUDA_VISIBLE_DEVICES"]=','.join(str(i) for i in gpus_available)
 
 # start logging
 logging.basicConfig(filename='experiment.log', level=logging.INFO)

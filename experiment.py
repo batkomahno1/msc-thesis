@@ -1,12 +1,6 @@
-# MULTI-GPU SUPPORT
-import os, json
-with open('/tmp/gpus.json', 'r') as f:
-    gpus = json.load(f)
-    if len(gpus) > 1:
-        os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-        os.environ["CUDA_VISIBLE_DEVICES"]=','.join(str(i) for i in gpus)
-        print('GPUs ', os.environ["CUDA_VISIBLE_DEVICES"])
-
+import os
+# check if gpus are set
+# print(os.environ["CUDA_VISIBLE_DEVICES"])
 import torch
 import torch.nn as nn
 
@@ -516,13 +510,9 @@ class Experiment(abc.ABC):
         if self.verbose: print('PSND Gan built')
 
         # delete samples except with given probability
-        if np.random.rand() < self.SAMPLES_RATAINED or itr == 0:
-            logging.info(f'Saved:{params} itr {itr}.')
-            self._plot_D(params, itr=itr)
-            self._visualize_samples(params, itr=itr)
-        else:
-            self._delete_samples(params, itr=itr)
-        if self.verbose: print('Cleanup complete')
+        self._plot_D(params, itr=itr)
+        self._visualize_samples(params, itr=itr)
+        if self.verbose: print('Plots and images generated')
 
         # get fid score
         fid = self._measure_FID(params, itr=itr)
