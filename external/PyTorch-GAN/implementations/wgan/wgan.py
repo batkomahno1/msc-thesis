@@ -1,4 +1,6 @@
 import os
+# # THIS MUST HAPPEN BEFORE TORCH IS IMPORTED!!!
+# os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
 import argparse
 import numpy as np
 import math
@@ -39,8 +41,15 @@ print(opt)
 
 img_shape = (opt.channels, opt.img_size, opt.img_size)
 
+# set gpu
 cuda = True if torch.cuda.is_available() else False
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+if cuda:
+    gpu_id = os.environ["CUDA_VISIBLE_DEVICES"][0]
+    device = "cuda:" + gpu_id
+else:
+    device = "cpu"
+
+Tensor = lambda *args: torch.FloatTensor(*args).to(device) if cuda else torch.FloatTensor(*args)
 
 class Generator(nn.Module):
     def __init__(self):
@@ -101,10 +110,9 @@ if torch.cuda.device_count() > 1:
 
 # NOTE: I added this
 # targets don't matter
-Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
 import torch.utils.data as data_utils
 var = torch.load(opt.data_path)
-dataset = data_utils.TensorDataset(var, torch.ones(var.shape[0]).type(Tensor))
+dataset = data_utils.TensorDataset(var, Tensor(torch.ones(var.shape[0])))
 
 dataloader = torch.utils.data.DataLoader(
     dataset,
@@ -116,8 +124,6 @@ dataloader = torch.utils.data.DataLoader(
 optimizer_G = torch.optim.RMSprop(generator.parameters(), lr=opt.lr)
 optimizer_D = torch.optim.RMSprop(discriminator.parameters(), lr=opt.lr)
 
-Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
-
 # ----------
 #  Training
 # ----------
@@ -128,7 +134,7 @@ for epoch in range(opt.n_epochs):
     for i, (imgs, _) in enumerate(dataloader):
 
         # Configure input
-        real_imgs = Variable(imgs.type(Tensor))
+        real_imgs = Tensor(imgs)
 
         # ---------------------
         #  Train Discriminator
