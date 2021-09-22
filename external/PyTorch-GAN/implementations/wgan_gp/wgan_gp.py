@@ -1,4 +1,6 @@
 import os
+# # THIS MUST HAPPEN BEFORE TORCH IS IMPORTED!!!
+# os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
 import argparse
 import numpy as np
 import math

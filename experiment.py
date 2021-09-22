@@ -1,6 +1,6 @@
 import os
 # check if gpus are set
-print('exp', os.environ["CUDA_VISIBLE_DEVICES"])
+# print('exp', os.environ["CUDA_VISIBLE_DEVICES"])
 import torch
 import torch.nn as nn
 

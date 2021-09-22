@@ -1,6 +1,6 @@
 import os
-# check if gpus are set
-print('acgan', os.environ["CUDA_VISIBLE_DEVICES"])
+# # THIS MUST HAPPEN BEFORE TORCH IS IMPORTED!!!
+assert os.environ["CUDA_DEVICE_ORDER"]=="PCI_BUS_ID"
 import argparse
 import numpy as np
 import math

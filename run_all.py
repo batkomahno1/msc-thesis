@@ -2,6 +2,8 @@
 import itertools
 import time
 import os
+# THIS MUST HAPPEN BEFORE TORCH IS IMPORTED!!!
+os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
 import pickle
 import argparse
 import logging
@@ -34,7 +36,6 @@ if opt.nb_gpus > 0 and torch.cuda.is_available():
     if nb_sys_gpus > 1:
         gpus = range(nb_sys_gpus)
         gpus_available = [i for i in gpus if gpu_mem[i] < 4][:opt.nb_gpus]
-    os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
     os.environ["CUDA_VISIBLE_DEVICES"]=','.join(str(i) for i in gpus_available)
     device = 'cuda:'+os.environ["CUDA_VISIBLE_DEVICES"][0]
     # print(os.environ["CUDA_VISIBLE_DEVICES"])
