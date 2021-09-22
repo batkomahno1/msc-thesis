@@ -15,6 +15,12 @@ parser.add_argument("--test", type=lambda v: v=='True', default=False, help="mea
 parser.add_argument("--nb_gpus", type=int, default=4, help="number of gpus to be used")
 opt = parser.parse_args()
 
+# start logging
+logging.basicConfig(filename='experiment.log', level=logging.INFO)
+logging.info(f'RUNNING EXPERIMENT {opt}')
+logging.info(time.asctime())
+
+
 # find available GPUs
 import os, torch, subprocess
 device = 'cpu'
@@ -31,22 +37,18 @@ if opt.nb_gpus > 0 and torch.cuda.is_available():
     os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
     os.environ["CUDA_VISIBLE_DEVICES"]=','.join(str(i) for i in gpus_available)
     device = 'cuda:'+os.environ["CUDA_VISIBLE_DEVICES"][0]
-
-# start logging
-logging.basicConfig(filename='experiment.log', level=logging.INFO)
-logging.info(f'RUNNING EXPERIME {opt}')
-logging.info(f'Number GPUs: {len(gpus_available)}')
-logging.info(time.asctime())
+    # print(os.environ["CUDA_VISIBLE_DEVICES"])
+    logging.info(f'Number GPUs: {len(gpus_available)}')
 
 from experiments import Experiment_WGAN, Experiment_WGAN_GP, Experiment_CGAN, Experiment_ACGAN
 
 ITERATIONS = opt.nb_iter if not opt.test else 1
 BATCH_SIZE = opt.batch_size
 EXPERIMENTS = [
-                Experiment_ACGAN(epochs=50, batch_size=BATCH_SIZE, verbose=opt.verbose, device=device), #epoch=50, max batch=?
-                Experiment_CGAN(epochs=50, batch_size=BATCH_SIZE, verbose=opt.verbose, device=device), #50, max batch=60k
-                Experiment_WGAN_GP(epochs=50, batch_size=BATCH_SIZE, verbose=opt.verbose, device=device), #100, max batch=60k
-                Experiment_WGAN(epochs=50, batch_size=BATCH_SIZE, verbose=opt.verbose, device=device), #100, max batch=60k
+                Experiment_ACGAN(epochs=1, batch_size=BATCH_SIZE, verbose=opt.verbose, device=device), #epoch=50, max batch=?
+                Experiment_CGAN(epochs=1, batch_size=BATCH_SIZE, verbose=opt.verbose, device=device), #50, max batch=60k
+                Experiment_WGAN_GP(epochs=1, batch_size=BATCH_SIZE, verbose=opt.verbose, device=device), #100, max batch=60k
+                Experiment_WGAN(epochs=1, batch_size=BATCH_SIZE, verbose=opt.verbose, device=device), #100, max batch=60k
                 ]
 ARCH_FAMILIES = {'WASSERSTEIN':('wgan', 'wgan_gp'), 'CONDITIONAL':('cgan', 'acgan')}
 PARAM_SET = {}

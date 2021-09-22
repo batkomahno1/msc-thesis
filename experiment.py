@@ -63,8 +63,8 @@ class Experiment(abc.ABC):
         #setup GPUs
         cuda = device.lower() != 'cpu' and torch.cuda.is_available()
         self.DEVICE = device if cuda else 'cpu'
-        self.FloatTensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
-        self.LongTensor = torch.cuda.LongTensor if cuda else torch.LongTensor
+        self.FloatTensor = lambda *args: torch.FloatTensor(*args).to(self.DEVICE) if cuda else torch.FloatTensor(*args)
+        self.LongTensor = lambda *args: torch.LongTensor(*args).to(self.DEVICE) if cuda else torch.LongTensor(*args)
 
         self.GAN_NAME = gan_name
         self.EPOCHS = epochs
@@ -291,17 +291,18 @@ class Experiment(abc.ABC):
             idxs_small_part = np.random.choice(idxs, nb_samples, replace=False)
             logging.info(f'Targeting attack at class {tgt_class} - {len(idxs_small_part)} samples')
 
+        # copy samples
+        X, labels = [v.detach().clone().to(self.DEVICE) for v in [self.data, self.targets]]
+
         # set targets
         y = self.FloatTensor(self.data.shape[0], 1).fill_(0.0).to(self.DEVICE)
         if 'noise' in note.lower():
-            self.data[idxs_small_part] = torch.rand_like(self.data[:idxs_small_part.shape[0]])
+            X[idxs_small_part] = torch.rand_like(self.data[:idxs_small_part.shape[0]])
             y[idxs_small_part] = 1.0
         elif 'earlystop'  in note.lower():
-            n, labels = idxs_small_part.shape[0], self.targets[idxs_small_part].to(self.DEVICE)
-            self.data[idxs_small_part] = self._generate(n, dataset, 0, itr=0, epoch=epoch, labels=labels)
+            n, var = idxs_small_part.shape[0], labels[idxs_small_part].detach().clone().to(self.DEVICE)
+            X[idxs_small_part] = self._generate(n, dataset, 0, itr=0, epoch=epoch, labels=var).to(self.DEVICE)
             y[idxs_small_part] = 1.0
-            # clean up
-            labels=labels.cpu(); del labels
         elif 'downgrade'  in note.lower():
             y[idxs_small_part] = 0
         else:
@@ -315,18 +316,14 @@ class Experiment(abc.ABC):
         adv = LinfPGDAttack(D, loss_fn=self.loss, clip_min=-1.0, clip_max=1.0, eps=eps, \
                             eps_iter=0.01, nb_iter=100, targeted=targeted)
 
-        # copy samples
-        X, labels = [v[idxs_small_part].detach().clone().to(self.DEVICE) for \
-                                                            v in [self.data, self.targets]]
-
         # attack samples
         if eps > 0:
-             X = adv.perturb(X, y=y[idxs_small_part], labels=labels).detach().clone().cpu()
-             labels = labels.detach().clone().cpu()
+            X[idxs_small_part] = adv.perturb(X[idxs_small_part], \
+                                                y=y[idxs_small_part],labels=labels[idxs_small_part])
 
         # save perturbed samples for GAN poisoning
-        torch.save(X, self.data_path.format(c, pct, itr))
-        torch.save(labels, self.targets_path.format(c, pct, itr))
+        torch.save(X[idxs_small_part].cpu(), self.data_path.format(c, pct, itr))
+        torch.save(labels[idxs_small_part].cpu(), self.targets_path.format(c, pct, itr))
         torch.save(idxs_small_part, self.idxs_path.format(c, pct, itr))
 
         # clean up

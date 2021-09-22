@@ -49,6 +49,9 @@ if cuda:
 else:
     device = "cpu"
 
+FloatTensor = lambda *args: torch.FloatTensor(*args).to(device) if cuda else torch.FloatTensor(*args)
+LongTensor = lambda *args: torch.LongTensor(*args).to(device) if cuda else torch.LongTensor(*args)
+
 def weights_init_normal(m):
     classname = m.__class__.__name__
     if classname.find("Conv") != -1:
@@ -160,9 +163,6 @@ dataloader = torch.utils.data.DataLoader(
 optimizer_G = torch.optim.Adam(generator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2))
 optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2))
 
-FloatTensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
-LongTensor = torch.cuda.LongTensor if cuda else torch.LongTensor
-
 def sample_image(n_row, batches_done):
     """Saves a grid of generated digits ranging from 0 to n_classes"""
     # Sample noise
@@ -188,8 +188,8 @@ for epoch in range(opt.n_epochs):
         fake = Variable(FloatTensor(batch_size, 1).fill_(0.0), requires_grad=False)
 
         # Configure input
-        real_imgs = Variable(imgs.type(FloatTensor))
-        labels = Variable(labels.type(LongTensor))
+        real_imgs = Variable(FloatTensor(imgs))
+        labels = Variable(LongTensor(labels))
 
         # -----------------
         #  Train Generator

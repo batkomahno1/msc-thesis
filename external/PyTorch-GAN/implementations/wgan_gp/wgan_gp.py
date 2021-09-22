@@ -50,6 +50,8 @@ if cuda:
 else:
     device = "cpu"
 
+Tensor = lambda *args: torch.FloatTensor(*args).to(device) if cuda else torch.FloatTensor(*args)
+
 class Generator(nn.Module):
     def __init__(self):
         super(Generator, self).__init__()
@@ -112,10 +114,9 @@ if torch.cuda.device_count() > 1:
 
 # NOTE: I added this
 # targets don't matter
-Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
 import torch.utils.data as data_utils
 var = torch.load(opt.data_path)
-dataset = data_utils.TensorDataset(var, torch.ones(var.shape[0]).type(Tensor))
+dataset = data_utils.TensorDataset(var, Tensor(torch.ones(var.shape[0])))
 
 dataloader = torch.utils.data.DataLoader(
     dataset,
@@ -123,14 +124,9 @@ dataloader = torch.utils.data.DataLoader(
     shuffle=True,
 )
 
-
-
 # Optimizers
 optimizer_G = torch.optim.Adam(generator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2))
 optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2))
-
-Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
-
 
 def compute_gradient_penalty(D, real_samples, fake_samples):
     """Calculates the gradient penalty loss for WGAN GP"""
@@ -163,7 +159,7 @@ for epoch in range(opt.n_epochs):
     for i, (imgs, _) in enumerate(dataloader):
 
         # Configure input
-        real_imgs = Variable(imgs.type(Tensor))
+        real_imgs = Tensor(imgs)
 
         # ---------------------
         #  Train Discriminator
