@@ -41,8 +41,13 @@ parser.add_argument("--save_epochs", type=lambda v: v=='True', default=False, he
 opt = parser.parse_args()
 print(opt)
 
+# set gpu
 cuda = True if torch.cuda.is_available() else False
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+if cuda:
+    gpu_id = os.environ["CUDA_VISIBLE_DEVICES"][0]
+    device = "cuda:" + gpu_id
+else:
+    device = "cpu"
 
 def weights_init_normal(m):
     classname = m.__class__.__name__

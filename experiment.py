@@ -50,7 +50,7 @@ CONDITIONAL_ARCHS = ['cgan', 'acgan']
 
 class Experiment(abc.ABC):
     # TODO: ADD LOGGER
-    def __init__(self, gan_name, epochs=100, batch_size=64, use_gpu=True, samples_ratained=0.1, \
+    def __init__(self, gan_name, epochs=100, batch_size=64, device='cuda:0', samples_ratained=0.1, \
                     latent_dim=100, nb_samples=1000, G_decorator=None, D_decorator=None, \
                     adv_decorator=None, loss=None, verbose=False):
         # check if GAN arch is implemented
@@ -61,9 +61,8 @@ class Experiment(abc.ABC):
         torch.cuda.empty_cache()
 
         #setup GPUs
-        self.USE_GPU = use_gpu
-        cuda = self.USE_GPU and torch.cuda.is_available()
-        self.DEVICE = 'cuda:0' if cuda else 'cpu'
+        cuda = device.lower() != 'cpu' and torch.cuda.is_available()
+        self.DEVICE = device if cuda else 'cpu'
         self.FloatTensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
         self.LongTensor = torch.cuda.LongTensor if cuda else torch.LongTensor
 
