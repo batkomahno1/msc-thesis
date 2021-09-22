@@ -150,3 +150,5 @@ download.sh
 
 tmp
 gpus.pkl
+
+tests
