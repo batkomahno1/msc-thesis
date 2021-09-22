@@ -1,6 +1,6 @@
 import os
 # check if gpus are set
-# print(os.environ["CUDA_VISIBLE_DEVICES"])
+print('acgan', os.environ["CUDA_VISIBLE_DEVICES"])
 import argparse
 import numpy as np
 import math

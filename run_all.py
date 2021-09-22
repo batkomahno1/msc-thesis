@@ -25,9 +25,10 @@ sys_gpus = torch.cuda.device_count()
 gpus_available = [0]
 if sys_gpus > 1:
     gpus = range(min(opt.nb_gpus, sys_gpus))
-    gpus_available = [i for i in gpus if mem_used[i] < 4]
+    gpus_available = [i for i in gpus if gpu_mem[i] < 4]
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"]=','.join(str(i) for i in gpus_available)
+print(os.environ["CUDA_VISIBLE_DEVICES"])
 
 # start logging
 logging.basicConfig(filename='experiment.log', level=logging.INFO)
