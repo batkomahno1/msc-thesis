@@ -11,11 +11,12 @@ source venv/bin/activate
 Check venv activated properly:
 pip3 -V
 
+For A100 GPUs do this:
+pip3 install torch==1.9.1+cu111 torchvision==0.10.1+cu111 -f https://download.pytorch.org/whl/torch_stable.html
+
 Install requirements:
 pip3 install -r requirements.txt
 
-For A100 GPUs do this:
-pip3 install torch==1.9.1+cu111 torchvision==0.10.1+cu111 torchaudio==0.9.1 -f https://download.pytorch.org/whl/torch_stable.html
 
 Check the GPUS:
 nvidia-smi OR watch -n 0.1 nvidia-smi

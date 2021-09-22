@@ -26,8 +26,8 @@ if opt.nb_gpus > 0 and torch.cuda.is_available():
     gpus_available = [0]
     # check if this is a multi-GPU machine
     if nb_sys_gpus > 1:
-        gpus = range(min(opt.nb_gpus, nb_sys_gpus))
-        gpus_available = [i for i in gpus if gpu_mem[i] < 4]
+        gpus = range(nb_sys_gpus)
+        gpus_available = [i for i in gpus if gpu_mem[i] < 4][:opt.nb_gpus]
     os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
     os.environ["CUDA_VISIBLE_DEVICES"]=','.join(str(i) for i in gpus_available)
     device = 'cuda:'+os.environ["CUDA_VISIBLE_DEVICES"][0]
