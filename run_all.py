@@ -39,7 +39,7 @@ if opt.nb_gpus > 0 and torch.cuda.is_available():
     os.environ["CUDA_VISIBLE_DEVICES"]=','.join(str(i) for i in gpus_available)
     device = os.environ["CUDA_VISIBLE_DEVICES"][0]
     logging.info(f'Number GPUs: {len(gpus_available)}')
-
+print('CUDA_VISIBLE_DEVICES: ',os.environ["CUDA_VISIBLE_DEVICES"])
 from experiments import Experiment_WGAN, Experiment_WGAN_GP, Experiment_CGAN, Experiment_ACGAN
 
 ITERATIONS = opt.nb_iter if not opt.test else 1
