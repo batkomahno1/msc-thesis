@@ -1,6 +1,4 @@
 import os
-# check if gpus are set
-print('exp', os.environ["CUDA_VISIBLE_DEVICES"])
 import torch
 import torch.nn as nn
 
@@ -60,11 +58,17 @@ class Experiment(abc.ABC):
         # don't need vars stored in GPU memory anymore, release them!
         torch.cuda.empty_cache()
 
+        self.verbose = verbose
+
         #setup GPUs
         cuda = device != 'cpu' and torch.cuda.is_available()
         self.DEVICE = 'cuda:'+device if cuda else 'cpu'
         self.FloatTensor = lambda *args: torch.FloatTensor(*args).to(self.DEVICE) if cuda else torch.FloatTensor(*args)
         self.LongTensor = lambda *args: torch.LongTensor(*args).to(self.DEVICE) if cuda else torch.LongTensor(*args)
+
+        # check if gpus are set
+        if self.verbose: print("CUDA_VISIBLE_DEVICES=", os.environ["CUDA_VISIBLE_DEVICES"])
+
 
         self.GAN_NAME = gan_name
         self.EPOCHS = epochs
@@ -132,8 +136,6 @@ class Experiment(abc.ABC):
             self.loss = lambda *args: default_loss.to(self.DEVICE)(args[0], args[1])
         else:
             self.loss = loss(self.DEVICE)
-
-        self.verbose = verbose
 
     def _load_raw_data(self, mean=0.5, std=0.5, dataset_name='mnist'):
         # TODO: THIS RESIZING IS A HUGE PROBLEM!! FIX IT
@@ -422,6 +424,7 @@ class Experiment(abc.ABC):
         c, pct = get_hyper_param(p)
         tgt_class = p[0]
 
+        self._data_to_GPU()
         # Sample labels
         if tgt_class in self.classes:
             labels = self.LongTensor(np.array([tgt_class]*nb_samples, dtype=np.int))
@@ -499,7 +502,7 @@ class Experiment(abc.ABC):
         self._build_gan(params, itr=itr)
         if self.verbose: print('PSND Gan built')
 
-        # delete samples except with given probability
+        # plot and visualize the results
         self._plot_D(params, itr=itr)
         self._visualize_samples(params, itr=itr)
         if self.verbose: print('Plots and images generated')
