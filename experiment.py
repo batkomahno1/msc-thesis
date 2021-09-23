@@ -371,7 +371,7 @@ class Experiment(abc.ABC):
                               cwd = self.GAN_DIR)
         proc.check_returncode()
         logging.info(f'Processed gan:{c} pct {pct} itr {itr} time {(time.time()-start)//60}m')
-
+        return proc.stdout.decode('utf-8')
     def _plot_D(self, p, itr=0, epoch=None):
         # show effect of adv samples on the victim D
         if epoch is None: epoch = self.EPOCHS-1
