@@ -33,10 +33,9 @@ print('CUDA_VISIBLE_DEVICES:',os.environ["CUDA_VISIBLE_DEVICES"])
 
 from experiments import Experiment_WGAN, Experiment_WGAN_GP, Experiment_CGAN, Experiment_ACGAN
 
-BATCH_SIZES = [2000]#[60,125,250,500,1000,2000]#[64,128,256,512,1024,2048]
-# [60000//b for b in BATCH_SIZES]
-# [60000/i for i in [60,125,250,500,1000,2000]]
-EPOCHS = 1#100
+GANS = ('wgan', 'wgan_gp', 'cgan', 'acgan')
+BATCH_SIZES = [60,125,250,500,1000,2000]#[64,128,256,512,1024,2048]
+EPOCHS = 100
 experiments = lambda batch_size:[
                 Experiment_ACGAN(epochs=EPOCHS, batch_size=batch_size, device=device), #epoch=50, max batch=?
                 Experiment_CGAN(epochs=EPOCHS, batch_size=batch_size, device=device), #50, max batch=60k
@@ -44,7 +43,7 @@ experiments = lambda batch_size:[
                 Experiment_WGAN(epochs=EPOCHS, batch_size=batch_size, device=device), #100, max batch=60k
                 ]
 ARCH_FAMILIES = {'WASSERSTEIN':('wgan', 'wgan_gp'), 'CONDITIONAL':('cgan', 'acgan')}
-GANS = ('acgan',)#('wgan', 'wgan_gp', 'cgan', 'acgan')
+
 PARAM_SET = {}
 
 def get_params(*args):
