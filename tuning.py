@@ -6,6 +6,7 @@ os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
 import pickle
 import argparse
 import logging
+from tqdm import tqdm
 
 # start logging
 logging.basicConfig(filename='experiment.log', level=logging.INFO)
@@ -28,18 +29,19 @@ if torch.cuda.is_available():
     os.environ["CUDA_VISIBLE_DEVICES"]=','.join(str(i) for i in gpus_available)
     device = os.environ["CUDA_VISIBLE_DEVICES"][0]
     logging.info(f'Number GPUs: {len(gpus_available)}')
+print('CUDA_VISIBLE_DEVICES:',os.environ["CUDA_VISIBLE_DEVICES"])
 
 from experiments import Experiment_WGAN, Experiment_WGAN_GP, Experiment_CGAN, Experiment_ACGAN
 
-BATCH_SIZES = [60,125,250,500,1000,2000]#[64,128,256,512,1024,2048]
+BATCH_SIZES = [2000]#[60,125,250,500,1000,2000]#[64,128,256,512,1024,2048]
 # [60000//b for b in BATCH_SIZES]
 # [60000/i for i in [60,125,250,500,1000,2000]]
-EPOCHS = 100
+EPOCHS = 1#100
 experiments = lambda batch_size:[
-                Experiment_ACGAN(epochs=EPOCHS, batch_size=batch_size, verbose=True, device=device), #epoch=50, max batch=?
-                Experiment_CGAN(epochs=EPOCHS, batch_size=batch_size, verbose=True, device=device), #50, max batch=60k
-                Experiment_WGAN_GP(epochs=EPOCHS, batch_size=batch_size, verbose=True, device=device), #100, max batch=60k
-                Experiment_WGAN(epochs=EPOCHS, batch_size=batch_size, verbose=True, device=device), #100, max batch=60k
+                Experiment_ACGAN(epochs=EPOCHS, batch_size=batch_size, device=device), #epoch=50, max batch=?
+                Experiment_CGAN(epochs=EPOCHS, batch_size=batch_size, device=device), #50, max batch=60k
+                Experiment_WGAN_GP(epochs=EPOCHS, batch_size=batch_size, device=device), #100, max batch=60k
+                Experiment_WGAN(epochs=EPOCHS, batch_size=batch_size, device=device), #100, max batch=60k
                 ]
 ARCH_FAMILIES = {'WASSERSTEIN':('wgan', 'wgan_gp'), 'CONDITIONAL':('cgan', 'acgan')}
 GANS = ('acgan',)#('wgan', 'wgan_gp', 'cgan', 'acgan')
@@ -62,15 +64,15 @@ PARAM_SET['WASSERSTEIN'] = get_params(tgt_class, TGT_EPOCHS, PCT, EPS, TARGETED,
 tgt_class=(6,)
 PARAM_SET['CONDITIONAL'] = get_params(tgt_class, TGT_EPOCHS, PCT, EPS, TARGETED, DATASET, ATK, NOTE)
 
-print('Starting runs...')
+print('Tuning...')
 result = dict()
-for batch_size in BATCH_SIZES:
+for batch_size in tqdm(BATCH_SIZES):
     for exp in experiments(batch_size):
         gan_name = exp.GAN_NAME
         arch_family = [k for k,v in ARCH_FAMILIES.items() if gan_name in v][0]
         for params in PARAM_SET[arch_family]:
             start = time.time()
-            print(gan_name, batch_size)
+            print(gan_name.upper(), batch_size)
             torch.cuda.empty_cache()
             eps, note, dataset = params[3], params[-1], params[-3]
             exp._load_raw_data(dataset_name=dataset)
