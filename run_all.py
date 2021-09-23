@@ -37,8 +37,7 @@ if opt.nb_gpus > 0 and torch.cuda.is_available():
         gpus = range(nb_sys_gpus)
         gpus_available = [i for i in gpus if gpu_mem[i] < 4][:opt.nb_gpus]
     os.environ["CUDA_VISIBLE_DEVICES"]=','.join(str(i) for i in gpus_available)
-    
-    # print(os.environ["CUDA_VISIBLE_DEVICES"])
+    device = os.environ["CUDA_VISIBLE_DEVICES"][0]
     logging.info(f'Number GPUs: {len(gpus_available)}')
 
 from experiments import Experiment_WGAN, Experiment_WGAN_GP, Experiment_CGAN, Experiment_ACGAN
@@ -46,10 +45,10 @@ from experiments import Experiment_WGAN, Experiment_WGAN_GP, Experiment_CGAN, Ex
 ITERATIONS = opt.nb_iter if not opt.test else 1
 BATCH_SIZE = opt.batch_size
 EXPERIMENTS = [
-                Experiment_ACGAN(epochs=1, batch_size=BATCH_SIZE, verbose=opt.verbose), #epoch=50, max batch=?
-                Experiment_CGAN(epochs=1, batch_size=BATCH_SIZE, verbose=opt.verbose), #50, max batch=60k
-                Experiment_WGAN_GP(epochs=1, batch_size=BATCH_SIZE, verbose=opt.verbose), #100, max batch=60k
-                Experiment_WGAN(epochs=1, batch_size=BATCH_SIZE, verbose=opt.verbose), #100, max batch=60k
+                Experiment_ACGAN(epochs=1, batch_size=BATCH_SIZE, verbose=opt.verbose, device=device), #epoch=50, max batch=?
+                Experiment_CGAN(epochs=1, batch_size=BATCH_SIZE, verbose=opt.verbose, device=device), #50, max batch=60k
+                Experiment_WGAN_GP(epochs=1, batch_size=BATCH_SIZE, verbose=opt.verbose, device=device), #100, max batch=60k
+                Experiment_WGAN(epochs=1, batch_size=BATCH_SIZE, verbose=opt.verbose, device=device), #100, max batch=60k
                 ]
 ARCH_FAMILIES = {'WASSERSTEIN':('wgan', 'wgan_gp'), 'CONDITIONAL':('cgan', 'acgan')}
 PARAM_SET = {}
