@@ -37,7 +37,7 @@ if opt.nb_gpus > 0 and torch.cuda.is_available():
         gpus = range(nb_sys_gpus)
         gpus_available = [i for i in gpus if gpu_mem[i] < 4][:opt.nb_gpus]
     os.environ["CUDA_VISIBLE_DEVICES"]=','.join(str(i) for i in gpus_available)
-    device = 'cuda:'+os.environ["CUDA_VISIBLE_DEVICES"][0]
+    
     # print(os.environ["CUDA_VISIBLE_DEVICES"])
     logging.info(f'Number GPUs: {len(gpus_available)}')
 

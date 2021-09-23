@@ -118,7 +118,7 @@ adversarial_loss.to(device)
 # Move models to parallel GPUs
 if torch.cuda.device_count() > 1:
     print('Running on ', torch.cuda.device_count(), ' GPUs')
-    generator, discriminator = [nn.DataParallel(model) for model in [generator, discriminator], device_ids=range(os.environ["CUDA_VISIBLE_DEVICES"])]
+    generator, discriminator = [nn.DataParallel(model) for model in [generator, discriminator]]
 
 # NOTE: I added this
 import torch.utils.data as data_utils

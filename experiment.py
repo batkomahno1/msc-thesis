@@ -1,6 +1,6 @@
 import os
 # check if gpus are set
-# print('exp', os.environ["CUDA_VISIBLE_DEVICES"])
+print('exp', os.environ["CUDA_VISIBLE_DEVICES"])
 import torch
 import torch.nn as nn
 
@@ -214,9 +214,6 @@ class Experiment(abc.ABC):
             pretrained_params = torch.load(self.gan_g_path.format(c,pct,itr,epoch),map_location=self.DEVICE)
             G.load_state_dict(pretrained_params, strict=False)
             G.to(self.DEVICE)
-            # Move models to parallel GPUs
-            if torch.cuda.device_count() > 1:
-                G = nn.DataParallel(G)
             G.eval()
             return G
 
@@ -226,9 +223,6 @@ class Experiment(abc.ABC):
         pretrained_params = torch.load(self.gan_d_path.format(c,pct,itr,epoch), map_location=self.DEVICE)
         D.load_state_dict(pretrained_params, strict=False)
         D.to(self.DEVICE)
-        # Move models to parallel GPUs
-        if torch.cuda.device_count() > 1:
-            D = nn.DataParallel(D)
         D.eval()
         return D
 
