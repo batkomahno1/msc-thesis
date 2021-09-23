@@ -62,13 +62,9 @@ class Experiment(abc.ABC):
 
         #setup GPUs
         cuda = device != 'cpu' and torch.cuda.is_available()
-        self.DEVICE = 'cuda:'+device if cuda else 'cpu'
+        self.DEVICE = 'cuda:'+str(device) if cuda else 'cpu'
         self.FloatTensor = lambda *args: torch.FloatTensor(*args).to(self.DEVICE) if cuda else torch.FloatTensor(*args)
         self.LongTensor = lambda *args: torch.LongTensor(*args).to(self.DEVICE) if cuda else torch.LongTensor(*args)
-
-        # check if gpus are set
-        if self.verbose: print("CUDA_VISIBLE_DEVICES=", os.environ["CUDA_VISIBLE_DEVICES"])
-
 
         self.GAN_NAME = gan_name
         self.EPOCHS = epochs
