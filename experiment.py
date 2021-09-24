@@ -182,7 +182,7 @@ class Experiment(abc.ABC):
     def _data_to_GPU(self):
         self.data, self.targets = [v.to(self.DEVICE) for v in [self.data, self.targets]]
 
-    def _init_gan_models(self, img_shape):
+    def _init_gan_models(self):
         # TODO: make D and G names arch dependent!
         path = self.GAN_ARCHS_DIR + self.GAN_NAME + '.py'
         D, G =  (_import_model(v, path) for v in ['Discriminator', 'Generator'])
@@ -368,6 +368,7 @@ class Experiment(abc.ABC):
         proc.check_returncode()
         logging.info(f'Processed gan:{c} pct {pct} itr {itr} time {(time.time()-start)//60}m')
         return proc.stdout.decode('utf-8')
+
     def _plot_D(self, p, itr=0, epoch=None):
         # show effect of adv samples on the victim D
         if epoch is None: epoch = self.EPOCHS-1
@@ -414,6 +415,11 @@ class Experiment(abc.ABC):
         c, pct = get_hyper_param(p)
         file = self.gan_g_path.format(c,pct,itr,epoch)
         return os.path.isfile(file)
+
+    def get_gan_path(self, p, itr=0, epoch=None):
+        if epoch is None: epoch = self.EPOCHS-1
+        c, pct = get_hyper_param(p)
+        return self.gan_g_path.format(c,pct,itr,epoch)
 
     def _measure_FID(self, p, itr=0, nb_samples=2048):
         start = time.time()
@@ -487,7 +493,7 @@ class Experiment(abc.ABC):
             if self.verbose: print('Clean GAN built')
 
         # init GAN models
-        self._init_gan_models(self.IMG_SHAPE)
+        self._init_gan_models()
         if self.verbose: print('Models initialized')
 
         # make adv nb_samples

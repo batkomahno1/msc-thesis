@@ -5,8 +5,9 @@ def get_storage(nb_sets = 2, nb_iter = 5, nb_pct = 2, nb_eps = 2, nb_types = 3):
     gans = ['cgan','acgan','wgan','wgan_gp']
     mb = 256
     iter_per_gan = nb_archs*nb_eps*nb_pct*nb_sets*nb_types
-    print("GB per exp: ", iter_per_gan*256//1024)
-    print("Total GB: ", nb_iter*iter_per_gan*256//1024)
+    per_iter=(iter_per_gan*256/2*0.1+iter_per_gan*256/2*0.2)//1024
+    print("GB per iter: ", per_iter)
+    print("Total GB: ", per_iter*nb_iter)
 
 
 def get_runtime(run_times=None, nb_sets = 2, nb_iter = 5, nb_pct = 2, nb_eps = 2, nb_types = 3):
@@ -16,8 +17,8 @@ def get_runtime(run_times=None, nb_sets = 2, nb_iter = 5, nb_pct = 2, nb_eps = 2
         var = [4,17,8,7]
         run_times = dict(zip(gans, var))
 
-    iter_per_gan = nb_archs*nb_eps*nb_pct*nb_sets*nb_types
-    tot_run_times = {g:iter_per_gan*t/60 for g, t in run_times.items()}
+    iter_per_gan = nb_archs*nb_eps*nb_pct*nb_sets+nb_archs*nb_pct*nb_sets
+    tot_run_times = {g:round(iter_per_gan*t/60) for g, t in run_times.items()}
     print('Experiments per GAN per iter ', iter_per_gan)
     print('Experiments per GAN ', iter_per_gan*nb_iter)
     print('Time per GAN per exp: ', run_times, 'm')
@@ -74,25 +75,28 @@ TARGETED=(True,)
 ATK = ('inf',)
 NOTE=('earlyStop','noise','downgrade',)
 
-run_times= {k[0]:round(mean(v)/60)/2 for k,v in times.items()}
-run_times['wgan']/=2; run_times['wgan_gp']/=2
+GPUS=4
+coef = GPUS//4
+run_times= {k[0]:round(mean(v)/60)/coef for k,v in times.items()}
+print(run_times)
+# run_times['wgan']/=2; run_times['wgan_gp']/=2
+
+gans = ['wgan','wgan_gp','cgan','acgan']
+var = [7,8,5,7]
+
+run_times = lambda var: dict(zip(gans, var))
 
 # Defaults: nb_sets = 2, nb_iter = 5, nb_pct = 2, nb_eps = 2, nb_types = 3
-nb_params = 2, 20, 2, 2, 3
-get_runtime(run_times, *nb_params)
-
+nb_params = 2, 10, 2, 2, 2
 get_storage(*nb_params)
+# nb_params = 2, 1, 1, 2, 2
+get_runtime(run_times(var), *nb_params)
 
-480/2*0.2+480/2*0.1
+var_ideal = [16,12//2+1,7,7]
+get_runtime(run_times(var_ideal), *nb_params)
 
-sum([round(2*2*2*3*4*t/60) for t in run_times.values()])*50//24
+var_mid = [9,12//2+1,7,7/2+1] #(250, 100), (250, 50), (500,100), (1000, 50)
+get_runtime(run_times(var_mid), *nb_params)
 
-# PARAMS TO USE TO MEASURE Time
-# WASSERSTEIN GANS
-DATASET=('fmnist',)
-TGT_EPOCHS=(0,)
-PCT=(20,)
-EPS=(1.0,)
-TARGETED=(True,)
-ATK = ('inf',)
-NOTE=('earlyStop',)
+var_low = [5,12//2+1,7,7//2+1] #
+get_runtime(run_times(var_low), *nb_params)
