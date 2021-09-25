@@ -79,7 +79,7 @@ def tune():
                 torch.cuda.empty_cache()
                 eps, note, dataset = params[3], params[-1], params[-3]
                 exp._load_raw_data(dataset_name=dataset)
-                out = exp._build_gan(dataset, save=True)
+                out = exp._build_gan(dataset)
                 result[(gan_name, batch_size)] = out, time.time()-start
                 save_res(result)
 
@@ -136,11 +136,11 @@ for g in ['cgan',]:
 # DECIDE WGAN BATCH SIZE 250 VS 500 VISUALLY
 from experiments import Experiment_WGAN
 from torchvision.utils import save_image
-for batch_size in [250,500]:
-    exp = Experiment_WGAN(epochs=100, batch_size=250, device=device)
+for batch_size in [250, 500, 1000]:
+    exp = Experiment_WGAN(epochs=50, batch_size=batch_size, device=device, verbose=True)
     params = 'fmnist'
     exp._load_raw_data(dataset_name=params)
     exp._build_gan(params)
     exp._init_gan_models()
-    z = exp._generate(25, params, 0)
-    save_image(z[:25], f'tuning/{exp.GAN_NAME}_batch_size_{batch_size}_epochs_100.png', nrow=5, normalize=True)
+    z_adv = exp._generate(400, params, 0, itr=0, labels = None)
+    save_image(z_adv, f'tuning/{exp.GAN_NAME}_{batch_size}.png', nrow=20, normalize=True)

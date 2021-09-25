@@ -366,6 +366,7 @@ class Experiment(abc.ABC):
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                               cwd = self.GAN_DIR)
         proc.check_returncode()
+        if self.verbose: print(proc.stdout.decode('utf-8'))
         logging.info(f'Processed gan:{c} pct {pct} itr {itr} time {(time.time()-start)//60}m')
         return proc.stdout.decode('utf-8')
 
@@ -421,14 +422,14 @@ class Experiment(abc.ABC):
         c, pct = get_hyper_param(p)
         return self.gan_g_path.format(c,pct,itr,epoch)
 
-    def _measure_FID(self, p, itr=0, nb_samples=2048):
-        start = time.time()
+    def make_imgs(self, p, itr=0, nb_samples=2048):
+        """Generate images and put them in /tmp/cln and /tmp/adv. Former are originals, later are fake."""
         c, pct = get_hyper_param(p)
         tgt_class = p[0]
 
         self._data_to_GPU()
         # Sample labels
-        if tgt_class in self.classes:
+        if not isinstance(tgt_class, str) and tgt_class > 0 and tgt_class in self.classes:
             labels = self.LongTensor(np.array([tgt_class]*nb_samples, dtype=np.int))
         else:
             labels = self.LongTensor(
@@ -438,11 +439,11 @@ class Experiment(abc.ABC):
         z_adv = self._generate(nb_samples, c, pct, itr=itr, labels = labels)
 
         # pick first matching index in targets for each label
+        # if no labels, then random picks
         matching = lambda e: torch.where(self.targets==e)[0]
         idxs = [matching(e)[0].item() for e in labels if len(matching(e)) > 0]
         assert len(idxs) == labels.shape[0]
 
-        # TODO: MAKE THESE A CLASS CONSTANT
         paths = self.CLN_IMGS_DIR, self.ADV_IMGS_DIR
         for path in paths:
             if os.path.exists(path):
@@ -450,18 +451,22 @@ class Experiment(abc.ABC):
             os.makedirs(path)
 
         for i in range(nb_samples):
-            save_image(self.data[idxs][i], f'{paths[0]}/cln_{i}.png')
-            save_image(z_adv[i], f'{paths[1]}/adv_{i}.png')
+            save_image(self.data[idxs][i], f'{paths[0]}/cln_{i}.png', normalize=True)
+            save_image(z_adv[i], f'{paths[1]}/adv_{i}.png', normalize=True)
 
         # don't need vars stored in GPU memory anymore, release them!
         self._data_to_CPU()
         del z_adv, matching, idxs
-
         ## TODO: THIS IS DESPERATE!! CHECK THE CONSEQUENCES!
         torch.cuda.empty_cache()
 
+    def _measure_FID(self, p, itr=0, nb_samples=2048):
+        start = time.time()
+
+        self.make_imgs(p, itr=itr, nb_samples=nb_samples)
+
         proc = subprocess.run(["python3",'-m','pytorch_fid','--device',self.DEVICE,
-                                paths[0], paths[1]],
+                                self.CLN_IMGS_DIR, self.ADV_IMGS_DIR],
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                 # capture_output=True,
                                 cwd = '.')
@@ -472,6 +477,13 @@ class Experiment(abc.ABC):
 
     def run(self, params, itr=0):
         """Returns a FID score"""
+        # # check if iteration exists
+        # if self._check_gan(params, itr=itr, epoch=None):
+        #     print('skip')
+        #     logging.info(f'Iteration exists, proceed to next: {params}')
+        #     return self.run(params, itr=itr+1)
+
+        # start experiment
         logging.info(f'Starting experiment: {self.GAN_NAME} {params} iteration {itr}.')
         start = time.time()
 
@@ -483,12 +495,13 @@ class Experiment(abc.ABC):
         dataset = params[-3]
 
         #load data
+        if self.verbose: print('Loading data...')
         self._load_raw_data(dataset_name=dataset)
         if self.verbose: print('Data loaded')
 
         # build clean gan
-        # TODO: CHECK STORAGE CONSUMPTION!!
         if not self._check_gan(dataset, itr=itr, epoch=None):
+            if self.verbose: print('Building clean GAN...')
             self._build_gan(dataset, itr=itr, save=True)
             if self.verbose: print('Clean GAN built')
 
@@ -497,10 +510,12 @@ class Experiment(abc.ABC):
         if self.verbose: print('Models initialized')
 
         # make adv nb_samples
+        if self.verbose: print('Crafting adv samples...')
         self._make_samples(params, itr=itr)
         if self.verbose: print('Adv samples created')
 
         # build adv gan
+        if self.verbose: print('Building PSND GAN...')
         self._build_gan(params, itr=itr)
         if self.verbose: print('PSND Gan built')
 
@@ -510,6 +525,7 @@ class Experiment(abc.ABC):
         if self.verbose: print('Plots and images generated')
 
         # get fid score
+        if self.verbose: print('Calculating FID...')
         fid = self._measure_FID(params, itr=itr)
         if self.verbose: print('FID Calculated')
 
