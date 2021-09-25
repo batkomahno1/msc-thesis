@@ -346,7 +346,7 @@ class Experiment(abc.ABC):
         # check if this is a cln build
         if isinstance(p, str):
             # copy samples
-            X_path, y_path = [v.format(c, pct, itr) for v in [self.data_path, self.targets_path]]
+            X_path, y_path = [v.format(c, pct, 0) for v in [self.data_path, self.targets_path]]
         else:
             X, y = self._load_adv_data(p,itr=itr)
             torch.save(X, self.TEMP_DATA_PATH)
@@ -365,6 +365,7 @@ class Experiment(abc.ABC):
                               # capture_output=True,
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                               cwd = self.GAN_DIR)
+        print(proc.stderr.decode('utf-8'))
         proc.check_returncode()
         if self.verbose: print(proc.stdout.decode('utf-8'))
         logging.info(f'Processed gan:{c} pct {pct} itr {itr} time {(time.time()-start)//60}m')
@@ -411,7 +412,7 @@ class Experiment(abc.ABC):
         name = self.RESULTS + OUTPUT_ID.format(c, pct, itr)+'.png'
         save_image(X[idxs][:25], name, nrow=5, normalize=True)
 
-    def _check_gan(self, p, itr=0, epoch=None):
+    def check_gan(self, p, itr=0, epoch=None):
         if epoch is None: epoch = self.EPOCHS-1
         c, pct = get_hyper_param(p)
         file = self.gan_g_path.format(c,pct,itr,epoch)
@@ -477,12 +478,6 @@ class Experiment(abc.ABC):
 
     def run(self, params, itr=0):
         """Returns a FID score"""
-        # # check if iteration exists
-        # if self._check_gan(params, itr=itr, epoch=None):
-        #     print('skip')
-        #     logging.info(f'Iteration exists, proceed to next: {params}')
-        #     return self.run(params, itr=itr+1)
-
         # start experiment
         logging.info(f'Starting experiment: {self.GAN_NAME} {params} iteration {itr}.')
         start = time.time()
@@ -500,7 +495,7 @@ class Experiment(abc.ABC):
         if self.verbose: print('Data loaded')
 
         # build clean gan
-        if not self._check_gan(dataset, itr=itr, epoch=None):
+        if not self.check_gan(dataset, itr=itr, epoch=None):
             if self.verbose: print('Building clean GAN...')
             self._build_gan(dataset, itr=itr, save=True)
             if self.verbose: print('Clean GAN built')
