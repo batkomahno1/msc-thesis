@@ -17,6 +17,9 @@ pip3 install torch==1.9.1+cu111 torchvision==0.10.1+cu111 -f https://download.py
 Install requirements:
 pip3 install -r requirements.txt
 
+One-liner:
+pip3 install torch==1.9.1+cu111 torchvision==0.10.1+cu111 -f https://download.pytorch.org/whl/torch_stable.html && pip3 install -r requirements.txt
+
 Check the GPUS:
 nvidia-smi OR watch -n 0.1 nvidia-smi
 
