@@ -396,7 +396,8 @@ class Experiment(abc.ABC):
             plt.hist(preds_big, alpha=0.5, label='X cln')
         plt.legend()
         # plt.title(p)
-        plt.savefig(self.RESULTS + 'victim_d_and_adv_samples' + str(p) + '_itr_' + str(itr) + '.svg')
+        name = self.RESULTS + 'PSND_D_'+OUTPUT_ID.format(c, pct, itr)+'.svg'
+        plt.savefig(name)
         plt.close()
 
         # remove from GPU!
@@ -409,7 +410,7 @@ class Experiment(abc.ABC):
         c, pct = get_hyper_param(p)
         X, _ = self._load_adv_data(p,itr=itr)
         idxs = torch.load(self.idxs_path.format(c,pct,itr))
-        name = self.RESULTS + OUTPUT_ID.format(c, pct, itr)+'.png'
+        name = self.RESULTS + 'ADV_SAMPLES_'+OUTPUT_ID.format(c, pct, itr)+'.png'
         save_image(X[idxs][:25], name, nrow=5, normalize=True)
 
     def check_gan(self, p, itr=0, epoch=None):
@@ -451,9 +452,14 @@ class Experiment(abc.ABC):
                 shutil.rmtree(path)
             os.makedirs(path)
 
+        # used for FID score comparison
         for i in range(nb_samples):
             save_image(self.data[idxs][i], f'{paths[0]}/cln_{i}.png', normalize=True)
             save_image(z_adv[i], f'{paths[1]}/adv_{i}.png', normalize=True)
+
+        # save some samples for evaluation
+        name = self.RESULTS + 'PSND_FAKES_'+OUTPUT_ID.format(c, pct, itr)+'.png'
+        save_image(z_adv[:25], name, nrow=5, normalize=True)
 
         # don't need vars stored in GPU memory anymore, release them!
         self._data_to_CPU()
