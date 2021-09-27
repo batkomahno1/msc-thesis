@@ -14,6 +14,9 @@ logging.info(f'TUNING')
 logging.info(time.asctime())
 
 import os, torch, subprocess
+
+from experiments import Experiment_WGAN, Experiment_WGAN_GP, Experiment_CGAN, Experiment_ACGAN
+
 from config_test import *
 
 GANS = ('wgan', 'wgan_gp', 'cgan', 'acgan')
@@ -41,9 +44,6 @@ def get_params(*args):
     return list(itertools.product(*args))
 
 def tune():
-
-    from experiments import Experiment_WGAN, Experiment_WGAN_GP, Experiment_CGAN, Experiment_ACGAN
-
     experiments = lambda batch_size:[
                     Experiment_ACGAN(epochs=EPOCHS, batch_size=batch_size, device=device), #epoch=50, max batch=?
                     Experiment_CGAN(epochs=EPOCHS, batch_size=batch_size, device=device), #50, max batch=60k
@@ -144,3 +144,47 @@ for batch_size in [250, 500, 1000]:
     exp._init_gan_models()
     z_adv = exp._generate(400, params, 0, itr=0, labels = None)
     save_image(z_adv, f'tuning/{exp.GAN_NAME}_{batch_size}.png', nrow=20, normalize=True)
+
+# INVESTIGATE CONVERVGENCE
+for g in ['acgan',]:
+    plt.figure(figsize=(20,10))
+    for batch_size in BATCH_SIZES:
+        out = result[g, batch_size][0]
+        runtime = result[g, batch_size][1]//60
+        strs = [s for s in out.split('\n') if '] [' in s][::60000//batch_size]
+        accs = [float(strs[i].split('] [')[2].split(' ')[-1][:-1]) for i in range(len(strs))]
+        epochs = [int(strs[i].split('] [')[0].split(' ')[-1].split('/')[0]) for i in range(len(strs))]
+        plt.plot(epochs[:20], accs[:20], label=f'size={batch_size} t={runtime}')
+        plt.xticks(epochs[:20])
+        plt.xlabel('epochs')
+        plt.ylabel('acc converted to %')
+        plt.legend()
+        plt.title(f'{g.upper()} Multi-GPU')
+    plt.show()
+max_epoch=5
+for g in ['acgan',]:
+    plt.figure(figsize=(20,10))
+    for batch_size in [1000]:
+        out = result[g, batch_size][0]
+        runtime = result[g, batch_size][1]//60
+        strs = [s for s in out.split('\n') if '] [' in s][::60000//batch_size]
+        accs = [float(strs[i].split('] [')[2].split(' ')[-1][:-1]) for i in range(len(strs))]
+        epochs = [int(strs[i].split('] [')[0].split(' ')[-1].split('/')[0]) for i in range(len(strs))]
+        plt.plot(epochs[:max_epoch], accs[:max_epoch], label=f'Multi-GPU: size={batch_size} t={runtime}')
+
+        with open('tuning/acgan_single_gpu') as file:
+            lines = file.readlines()
+            lines = [line.rstrip() for line in lines]
+        out = lines
+        runtime = 'n/a'
+        strs = [s for s in out if '] [' in s][::60000//batch_size]
+        accs = [float(strs[i].split('] [')[2].split(' ')[-1][:-1]) for i in range(len(strs))]
+        epochs = [int(strs[i].split('] [')[0].split(' ')[-1].split('/')[0]) for i in range(len(strs))]
+        plt.plot(epochs[:max_epoch], accs[:max_epoch], label=f'Single-GPU: size={batch_size} t={runtime}')
+
+        plt.xticks(epochs[:max_epoch])
+        plt.xlabel('epochs')
+        plt.ylabel('acc converted to %')
+        plt.legend()
+        plt.title(f'{g.upper()} Single vs Multi GPU')
+    plt.show()

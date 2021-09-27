@@ -411,12 +411,13 @@ class Experiment(abc.ABC):
         X, _ = self._load_adv_data(p,itr=itr)
         idxs = torch.load(self.idxs_path.format(c,pct,itr))
         name = self.RESULTS + 'ADV_SAMPLES_'+OUTPUT_ID.format(c, pct, itr)+'.png'
-        save_image(X[idxs][:25], name, nrow=5, normalize=True)
+        save_image(X[idxs][:25].detach().cpu(), name, nrow=5, normalize=True)
 
     def check_gan(self, p, itr=0, epoch=None):
         if epoch is None: epoch = self.EPOCHS-1
         c, pct = get_hyper_param(p)
         file = self.gan_g_path.format(c,pct,itr,epoch)
+        # print(file)
         return os.path.isfile(file)
 
     def get_gan_path(self, p, itr=0, epoch=None):
@@ -454,12 +455,12 @@ class Experiment(abc.ABC):
 
         # used for FID score comparison
         for i in range(nb_samples):
-            save_image(self.data[idxs][i], f'{paths[0]}/cln_{i}.png', normalize=True)
-            save_image(z_adv[i], f'{paths[1]}/adv_{i}.png', normalize=True)
+            save_image(self.data[idxs][i].detach().cpu(), f'{paths[0]}/cln_{i}.png', normalize=True)
+            save_image(z_adv[i].detach().cpu(), f'{paths[1]}/adv_{i}.png', normalize=True)
 
         # save some samples for evaluation
         name = self.RESULTS + 'PSND_FAKES_'+OUTPUT_ID.format(c, pct, itr)+'.png'
-        save_image(z_adv[:25], name, nrow=5, normalize=True)
+        save_image(z_adv[:25].detach().cpu(), name, nrow=5, normalize=True)
 
         # don't need vars stored in GPU memory anymore, release them!
         self._data_to_CPU()

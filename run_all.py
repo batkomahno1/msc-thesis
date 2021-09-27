@@ -41,24 +41,20 @@ if opt.nb_gpus > 0 and torch.cuda.is_available():
     logging.info(f'Number GPUs: {len(gpus_available)}')
     print('CUDA_VISIBLE_DEVICES: ',os.environ["CUDA_VISIBLE_DEVICES"])
 
+var = [Experiment_WGAN, Experiment_WGAN_GP, Experiment_CGAN, Experiment_ACGAN]
+val = ['wgan', 'wgan_gp', 'cgan', 'acgan']
 if not opt.test:
+    from config import *
     ITERATIONS = opt.nb_iter
-    EXPERIMENTS = [
-                    Experiment_ACGAN(epochs=50, batch_size=1000, verbose=opt.verbose, device=device),
-                    Experiment_CGAN(epochs=100, batch_size=500, verbose=opt.verbose, device=device),
-                    Experiment_WGAN_GP(epochs=50, batch_size=250, verbose=opt.verbose, device=device),
-                    Experiment_WGAN(epochs=100, batch_size=500, verbose=opt.verbose, device=device),
-                    ]
+    EXPERIMENTS = [v(epochs = GAN_SETTINGS[name][0], batch_size=GAN_SETTINGS[name][1], \
+                    verbose=opt.verbose, device=device) for v, name in zip(var, val)]
 else:
+    from config_test import *
     opt.verbose=True
     ITERATIONS = 1
     epochs = 5
-    EXPERIMENTS = [
-                    Experiment_ACGAN(epochs=epochs, batch_size=1000, verbose=True, device=device),
-                    Experiment_CGAN(epochs=epochs, batch_size=1000, verbose=True, device=device),
-                    Experiment_WGAN_GP(epochs=epochs, batch_size=1000, verbose=True, device=device),
-                    Experiment_WGAN(epochs=epochs, batch_size=1000, verbose=True, device=device),
-                    ]
+    EXPERIMENTS = [v(epochs = epochs, batch_size=1000, verbose=opt.verbose, device=device) for v in var]
+
 ARCH_FAMILIES = {'WASSERSTEIN':('wgan', 'wgan_gp'), 'CONDITIONAL':('cgan', 'acgan')}
 PARAM_SET = {}
 RUN_NAME = 'run_'+'_'.join(time.asctime().split(' ')[1:3]).lower()+'_'+time.asctime().split(' ')[-1]
@@ -76,11 +72,6 @@ def save_res(obj):
         pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
     with open(RUN_PATH_CURR, 'wb') as f:
         pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
-
-if opt.test:
-    from config_test import *
-else:
-    from config import *
 
 tgt_class=(-1,)
 PARAM_SET['WASSERSTEIN'] = get_params(tgt_class, TGT_EPOCHS, PCT, EPS, TARGETED, DATASET, ATK, NOTE)
@@ -123,8 +114,8 @@ for itr in range(iter_start, iter_start + ITERATIONS):
             fid = exp.run(params, itr=itr)
             result[(gan_name, params, itr)] = fid, time.time()-start
         # calculate clean FID here
-        dataset = params[-3]
-        fid = exp._measure_FID(dataset, itr=itr)
-        result[(gan_name, dataset, itr)] = fid, time.time()-start
+        for dataset in DATASET:
+            fid = exp._measure_FID(dataset, itr=itr)
+            result[(gan_name, dataset, itr)] = fid, time.time()-start
     # save at the end of an iteration
     save_res(result)
