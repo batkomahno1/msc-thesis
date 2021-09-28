@@ -43,7 +43,7 @@ print(opt)
 cuda = True if torch.cuda.is_available() else False
 if cuda:
     # TODO: check this indexing
-    gpu_id = '0'#os.environ["CUDA_VISIBLE_DEVICES"][0]
+    gpu_id = os.environ["CUDA_VISIBLE_DEVICES"][0]
     device = "cuda:" + gpu_id
 else:
     device = "cpu"

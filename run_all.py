@@ -8,6 +8,7 @@ import pickle
 import argparse
 import logging
 from collections import Counter
+import shutil
 
 from experiments import Experiment_WGAN, Experiment_WGAN_GP, Experiment_CGAN, Experiment_ACGAN
 
@@ -16,6 +17,7 @@ parser.add_argument("--nb_iter", type=int, default=1, help="number of iterations
 parser.add_argument("--verbose", type=lambda v: v=='True', default=False, help="verbose")
 parser.add_argument("--test", type=lambda v: v=='True', default=False, help="measure runtimes")
 parser.add_argument("--nb_gpus", type=int, default=4, help="number of gpus to be used")
+parser.add_argument("--reset", type=lambda v: v=='True', default=False, help="measure runtimes")
 opt = parser.parse_args()
 
 # start logging
@@ -41,6 +43,7 @@ if opt.nb_gpus > 0 and torch.cuda.is_available():
     logging.info(f'Number GPUs: {len(gpus_available)}')
     print('CUDA_VISIBLE_DEVICES: ',os.environ["CUDA_VISIBLE_DEVICES"])
 
+# Initialize architectures
 var = [Experiment_WGAN, Experiment_WGAN_GP, Experiment_CGAN, Experiment_ACGAN]
 val = ['wgan', 'wgan_gp', 'cgan', 'acgan']
 if not opt.test:
@@ -55,12 +58,21 @@ else:
     epochs = 5
     EXPERIMENTS = [v(epochs = epochs, batch_size=1000, verbose=opt.verbose, device=device) for v in var]
 
+# reset if necessary
+if opt.reset:
+    for exp in EXPERIMENTS:
+        exp.reset()
+
 ARCH_FAMILIES = {'WASSERSTEIN':('wgan', 'wgan_gp'), 'CONDITIONAL':('cgan', 'acgan')}
 PARAM_SET = {}
 RUN_NAME = 'run_'+'_'.join(time.asctime().split(' ')[1:3]).lower()+'_'+time.asctime().split(' ')[-1]
 RES_DIR =  os.getcwd() + '/experiment_results/'
 RUN_PATH = RES_DIR + RUN_NAME + '.pkl'
 RUN_PATH_CURR = RES_DIR + 'results.pkl'
+
+if opt.reset:
+    if os.path.exists(RES_DIR):
+        shutil.rmtree(RES_DIR)
 
 if not os.path.exists(RES_DIR): os.makedirs(RES_DIR)
 
@@ -115,6 +127,7 @@ for itr in range(iter_start, iter_start + ITERATIONS):
             result[(gan_name, params, itr)] = fid, time.time()-start
         # calculate clean FID here
         for dataset in DATASET:
+            if opt.verbose: print('Calculating clean FID')
             fid = exp._measure_FID(dataset, itr=itr)
             result[(gan_name, dataset, itr)] = fid, time.time()-start
     # save at the end of an iteration

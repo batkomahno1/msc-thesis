@@ -9,6 +9,7 @@ from torchvision.utils import save_image
 import numpy as np
 import matplotlib.pyplot as plt
 
+import gc
 import abc
 import sys
 import subprocess
@@ -25,6 +26,8 @@ from advertorch.attacks import LinfPGDAttack
 OUTPUT_ID = 'param_{}_pct_{}_iter_{}'
 HYPERPARAM = 'tgt_{}_epoch_{}_eps_{}_tgted_{}_set_{}_atk_{}_note_{}'
 
+IMPLEMENTED_ARCHS = ['cgan','acgan','wgan','wgan_gp']
+CONDITIONAL_ARCHS = ['cgan', 'acgan']
 #IMG_SHAPE = (1, 28, 28)
 
 def get_hyper_param(p):
@@ -43,8 +46,15 @@ def _import_model(model_name, model_path):
 
 to_numpy_squeeze = lambda x: x.detach().squeeze().cpu().numpy()
 
-IMPLEMENTED_ARCHS = ['cgan','acgan','wgan','wgan_gp']
-CONDITIONAL_ARCHS = ['cgan', 'acgan']
+def _check_mem():
+    for obj in gc.get_objects():
+        try:
+            if torch.is_tensor(obj) or (hasattr(obj, 'data') and torch.is_tensor(obj.data)):
+                print(type(obj), obj.size(), obj.device)
+        except:
+            pass
+    print('Paused for 10 seconds...')
+    time.sleep(10)
 
 class Experiment(abc.ABC):
     # TODO: ADD LOGGER
@@ -97,13 +107,13 @@ class Experiment(abc.ABC):
         MNIST_CNN_PATH = self.TEST_MODELS_DIR + 'main.py'# TODO: rename with self
         MNIST_CNN_W_PATH = self.TEST_MODELS_DIR + 'mnist_weights.pt'# TODO: rename with self
 
-        dirs = [
+        self.CREATED_DIRS = [
         self.DATA_DIR, self.GAN_WEIGHTS_DIR, self.TEST_MODELS_DIR, self.RESULTS, \
         self.TMP_DIR, self.CLN_IMGS_DIR, self.ADV_IMGS_DIR
         ]
 
         # safely create working dirs
-        for directory in dirs:
+        for directory in self.CREATED_DIRS:
             if not os.path.exists(directory):
                 os.makedirs(directory)
 
@@ -292,8 +302,8 @@ class Experiment(abc.ABC):
             X[idxs_small_part] = torch.rand_like(self.data[:idxs_small_part.shape[0]])
             y[idxs_small_part] = 1.0
         elif 'earlystop'  in note.lower():
-            n, var = idxs_small_part.shape[0], labels[idxs_small_part].detach().clone().to(self.DEVICE)
-            X[idxs_small_part] = self._generate(n, dataset, 0, itr=0, epoch=epoch, labels=var).to(self.DEVICE)
+            n, var = idxs_small_part.shape[0], labels[idxs_small_part].to(self.DEVICE).detach().clone()
+            X[idxs_small_part] = self._generate(n, dataset, 0, itr=0, epoch=epoch, labels=var).to(self.DEVICE).detach().clone()
             y[idxs_small_part] = 1.0
         elif 'downgrade'  in note.lower():
             y[idxs_small_part] = 0
@@ -311,7 +321,7 @@ class Experiment(abc.ABC):
         # attack samples
         if eps > 0:
             X[idxs_small_part] = adv.perturb(X[idxs_small_part], \
-                                                y=y[idxs_small_part],labels=labels[idxs_small_part])
+                                                y=y[idxs_small_part],labels=labels[idxs_small_part]).detach().clone()
 
         # save perturbed samples for GAN poisoning
         torch.save(X[idxs_small_part].cpu(), self.data_path.format(c, pct, itr))
@@ -320,7 +330,8 @@ class Experiment(abc.ABC):
 
         # clean up
         self._data_to_CPU()
-        D0=D0.cpu();del adv, D, D0, X, y, labels
+        del adv, D, D0, X, y, labels, var, idxs_small_part
+        gc.collect()
         torch.cuda.empty_cache()
 
         # log
@@ -465,14 +476,13 @@ class Experiment(abc.ABC):
         # don't need vars stored in GPU memory anymore, release them!
         self._data_to_CPU()
         del z_adv, matching, idxs
-        ## TODO: THIS IS DESPERATE!! CHECK THE CONSEQUENCES!
         torch.cuda.empty_cache()
 
     def _measure_FID(self, p, itr=0, nb_samples=2048):
         start = time.time()
 
         self.make_imgs(p, itr=itr, nb_samples=nb_samples)
-
+        torch.cuda.empty_cache()
         proc = subprocess.run(["python3",'-m','pytorch_fid','--device',self.DEVICE,
                                 self.CLN_IMGS_DIR, self.ADV_IMGS_DIR],
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -482,6 +492,13 @@ class Experiment(abc.ABC):
         fid = float(proc.stdout.decode('utf-8').split()[-1])
         logging.info(f'FID={fid} for {p}_itr_{itr} {(time.time()-start):0.0f}s')
         return fid
+
+    def reset(self):
+        """Delete old data"""
+        for path in self.CREATED_DIRS:
+            if os.path.exists(path):
+                shutil.rmtree(path)
+            os.makedirs(path)
 
     def run(self, params, itr=0):
         """Returns a FID score"""
@@ -515,6 +532,7 @@ class Experiment(abc.ABC):
         if self.verbose: print('Crafting adv samples...')
         self._make_samples(params, itr=itr)
         if self.verbose: print('Adv samples created')
+        # _check_mem()
 
         # build adv gan
         if self.verbose: print('Building PSND GAN...')
