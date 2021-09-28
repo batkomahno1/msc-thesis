@@ -145,7 +145,7 @@ def sample_image(n_row, batches_done):
     labels = np.array([num for _ in range(n_row) for num in range(n_row)])
     labels = Variable(LongTensor(labels))
     gen_imgs = generator(z, labels)
-    print(gen_imgs.shape)
+    # print(gen_imgs.shape)
     save_image(gen_imgs.data, "images/%d.png" % batches_done, nrow=n_row, normalize=True)
 
 
@@ -219,12 +219,12 @@ for epoch in range(opt.n_epochs):
     # NOTE: I added this
     if opt.save_epochs:
         os.makedirs("weights", exist_ok=True)
-        torch.save(discriminator.state_dict(), './weights/d_'+opt.output_id+'_epoch_'+str(epoch)+'.pth')
-        torch.save(generator.state_dict(), './weights/g_'+opt.output_id+'_epoch_'+str(epoch)+'.pth')
+        torch.save(discriminator.module.state_dict(), './weights/d_'+opt.output_id+'_epoch_'+str(epoch)+'.pth')
+        torch.save(generator.module.state_dict(), './weights/g_'+opt.output_id+'_epoch_'+str(epoch)+'.pth')
 
 os.makedirs("weights", exist_ok=True)
 name_d = './weights/d_'+opt.output_id+'_epoch_'+str(epoch)+'.pth'
 name_g = './weights/g_'+opt.output_id+'_epoch_'+str(epoch)+'.pth'
 
-torch.save(discriminator.state_dict(), name_d)
-torch.save(generator.state_dict(), name_g)
+torch.save(discriminator.module.state_dict(), name_d)
+torch.save(generator.module.state_dict(), name_g)

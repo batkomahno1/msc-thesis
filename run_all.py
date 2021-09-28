@@ -85,10 +85,12 @@ def save_res(obj):
     with open(RUN_PATH_CURR, 'wb') as f:
         pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
 
-tgt_class=(-1,)
+# set different target classes and target epochs for conditional and wasserstein architectures
+# tgt_class, tgt_epochs = (-1,), (0,)
+tgt_class = (-1,)
 PARAM_SET['WASSERSTEIN'] = get_params(tgt_class, TGT_EPOCHS, PCT, EPS, TARGETED, DATASET, ATK, NOTE)
 
-tgt_class=(6,)
+tgt_class = (6,)
 PARAM_SET['CONDITIONAL'] = get_params(tgt_class, TGT_EPOCHS, PCT, EPS, TARGETED, DATASET, ATK, NOTE)
 
 if opt.verbose: print('Starting runs...')

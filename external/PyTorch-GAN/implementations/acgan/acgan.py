@@ -114,7 +114,7 @@ class Discriminator(nn.Module):
 
         # Output layers
         self.adv_layer = nn.Sequential(nn.Linear(128 * ds_size ** 2, 1), nn.Sigmoid())
-        self.aux_layer = nn.Sequential(nn.Linear(128 * ds_size ** 2, opt.n_classes), nn.Softmax())
+        self.aux_layer = nn.Sequential(nn.Linear(128 * ds_size ** 2, opt.n_classes), nn.Softmax(dim=1))
 
     def forward(self, img):
         out = self.conv_blocks(img)
@@ -246,12 +246,12 @@ for epoch in range(opt.n_epochs):
     # NOTE: I added this
     if opt.save_epochs:
         os.makedirs("weights", exist_ok=True)
-        torch.save(discriminator.state_dict(), './weights/d_'+opt.output_id+'_epoch_'+str(epoch)+'.pth')
-        torch.save(generator.state_dict(), './weights/g_'+opt.output_id+'_epoch_'+str(epoch)+'.pth')
+        torch.save(discriminator.module.state_dict(), './weights/d_'+opt.output_id+'_epoch_'+str(epoch)+'.pth')
+        torch.save(generator.module.state_dict(), './weights/g_'+opt.output_id+'_epoch_'+str(epoch)+'.pth')
 
 os.makedirs("weights", exist_ok=True)
 name_d = './weights/d_'+opt.output_id+'_epoch_'+str(epoch)+'.pth'
 name_g = './weights/g_'+opt.output_id+'_epoch_'+str(epoch)+'.pth'
 
-torch.save(discriminator.state_dict(), name_d)
-torch.save(generator.state_dict(), name_g)
+torch.save(discriminator.module.state_dict(), name_d)
+torch.save(generator.module.state_dict(), name_g)

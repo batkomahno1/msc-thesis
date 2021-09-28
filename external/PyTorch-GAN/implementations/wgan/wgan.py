@@ -189,12 +189,12 @@ for epoch in range(opt.n_epochs):
     # NOTE: I added this
     if opt.save_epochs:
         print(opt.save_epochs)
-        torch.save(discriminator.state_dict(), './weights/d_'+opt.output_id+'_epoch_'+str(epoch)+'.pth')
-        torch.save(generator.state_dict(), './weights/g_'+opt.output_id+'_epoch_'+str(epoch)+'.pth')
+        torch.save(discriminator.module.state_dict(), './weights/d_'+opt.output_id+'_epoch_'+str(epoch)+'.pth')
+        torch.save(generator.module.state_dict(), './weights/g_'+opt.output_id+'_epoch_'+str(epoch)+'.pth')
 
 
 name_d = './weights/d_'+opt.output_id+'_epoch_'+str(epoch)+'.pth'
 name_g = './weights/g_'+opt.output_id+'_epoch_'+str(epoch)+'.pth'
 
-torch.save(discriminator.state_dict(), name_d)
-torch.save(generator.state_dict(), name_g)
+torch.save(discriminator.module.state_dict(), name_d)
+torch.save(generator.module.state_dict(), name_g)

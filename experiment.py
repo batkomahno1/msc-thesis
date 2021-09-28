@@ -483,7 +483,8 @@ class Experiment(abc.ABC):
 
         self.make_imgs(p, itr=itr, nb_samples=nb_samples)
         torch.cuda.empty_cache()
-        proc = subprocess.run(["python3",'-m','pytorch_fid','--device',self.DEVICE,
+        id = os.environ["CUDA_VISIBLE_DEVICES"][-1]
+        proc = subprocess.run(["python3",'-m','pytorch_fid','--device','cuda:'+id,
                                 self.CLN_IMGS_DIR, self.ADV_IMGS_DIR],
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                 # capture_output=True,

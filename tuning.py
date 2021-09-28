@@ -111,6 +111,27 @@ for g in GANS:
     plt.show()
     plt.savefig(f'tuning/{g}_tuning.svg')
 
+# FIRST FIVE EPOCHS FOR DECOYS
+plt.close()
+for g in GANS:
+    plt.figure(figsize=(20,10))
+    for batch_size in BATCH_SIZES:
+        out = result[g, batch_size][0]
+        runtime = result[g, batch_size][1]//60
+        strs = [s for s in out.split('\n') if '] [' in s][::60000//batch_size]
+        accs = [float(strs[i].split('] [')[2].split(' ')[-1][:-1]) for i in range(len(strs))]
+        if g in ['cgan']:
+            accs=[sigmoid(a) for a in accs]
+        epochs = [int(strs[i].split('] [')[0].split(' ')[-1].split('/')[0]) for i in range(len(strs))]
+        print([len(v) for v in [accs,epochs]])
+        plt.plot(epochs[:10], accs[:10], label=f'size={batch_size} t={runtime}...')
+        plt.xticks(epochs[:10])
+        plt.xlabel('epochs')
+        plt.ylabel('acc')
+        plt.legend()
+        plt.title(f'{g.upper()} Decoy Selection')
+    plt.show()
+    # plt.savefig(f'tuning/{g}_tuning.svg')
 
 # INVESTIGATE CGAN DEEPER
 for g in ['cgan',]:
@@ -121,8 +142,6 @@ for g in ['cgan',]:
         strs = [s for s in out.split('\n') if '] [' in s][::60000//batch_size]
         accs = [float(strs[i].split('] [')[2].split(' ')[-1][:-1]) for i in range(len(strs))]
         accs=[sigmoid(a) for a in accs]
-        # if g in ['wgan','wgan_gp']:
-        #     accs=[sigmoid(a) for a in accs]
         epochs = [int(strs[i].split('] [')[0].split(' ')[-1].split('/')[0]) for i in range(len(strs))]
         plt.plot(epochs[20:], accs[20:], label=f'size={batch_size} t={runtime}')
         # plt.xticks(epochs)
