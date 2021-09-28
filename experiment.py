@@ -330,7 +330,7 @@ class Experiment(abc.ABC):
 
         # clean up
         self._data_to_CPU()
-        del adv, D, D0, X, y, labels, var, idxs_small_part
+        del adv, D, D0, X, y, labels, idxs_small_part
         gc.collect()
         torch.cuda.empty_cache()
 
