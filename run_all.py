@@ -3,6 +3,7 @@ import itertools
 import time
 import os
 # THIS MUST HAPPEN BEFORE TORCH IS IMPORTED!!!
+# makes pytorch cuda order GPUs the same way nvidis-smi does
 os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
 import pickle
 import argparse
@@ -25,7 +26,8 @@ logging.basicConfig(filename='experiment.log', level=logging.INFO)
 logging.info(f'RUNNING EXPERIMENT {opt}')
 logging.info(time.asctime())
 
-# find available GPUs
+# find available GPUs and mark them for use
+# always uses cuda:0
 import os, torch, subprocess
 device = 'cpu'
 if opt.nb_gpus > 0 and torch.cuda.is_available():
@@ -96,6 +98,8 @@ PARAM_SET['CONDITIONAL'] = get_params(tgt_class, TGT_EPOCHS, PCT, EPS, TARGETED,
 if opt.verbose: print('Starting runs...')
 
 # find last iterarion
+# it will overwrite half finished ITERATIONS
+# consistency check: every parameter set was run the same number of times
 iter_start = 0
 if os.path.isfile(RUN_PATH_CURR):
     with open(RUN_PATH_CURR, 'rb') as f:
@@ -129,6 +133,7 @@ for itr in range(iter_start, iter_start + ITERATIONS):
             result[(gan_name, params, itr)] = fid, time.time()-start
         # calculate clean FID here
         for dataset in DATASET:
+            # TODO: FORGOT TO RESTART THE TIMER!
             if opt.verbose: print('Calculating clean FID')
             fid = exp._measure_FID(dataset, itr=itr)
             result[(gan_name, dataset, itr)] = fid, time.time()-start
