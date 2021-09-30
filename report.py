@@ -49,7 +49,13 @@ var
 params_reduced = sorted(var, key = lambda v: (v,0,0,0) if isinstance(v, str) else (v[2],v[0],v[3],v[1]))
 params_reduced
 import matplotlib.pyplot as plt
-fig, axs = plt.subplots(max(len(gans),2), 2, figsize=(10,10), sharex=False)
+import numpy as np
+fig, axs = plt.subplots(len(gans), 2, figsize=(10,10), sharex=False)
+if len(axs.shape) < 2:
+    print('Reshaping axis...')
+    axs.shape = 1,2
+    # temp[0,0], temp[0,1] = axs[0], axs[1]
+    # axs = temp
 fig.autofmt_xdate(rotation=45)
 idx_d = lambda d: 0 if d=='mnist' else 1
 for i, g in enumerate(gans):
@@ -63,8 +69,6 @@ for i, g in enumerate(gans):
             x[idx_d(d)].append(str(p))
             y[idx_d(d)].append(accum[g,p])
     for idx in [0,1]:
-        print(y, x)
-        print(y[idx], x[idx])
         axs[i, idx].boxplot(y[idx], labels=x[idx])
         # [tick.set_rotation(15) for tick in axs[i, idx].get_xticklabels()]
 plt.savefig('reports/'+source+'-report.png')
