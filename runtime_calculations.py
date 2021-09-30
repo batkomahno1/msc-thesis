@@ -55,7 +55,7 @@ with open(file, 'rb') as f:
 from statistics import mean
 
 # res
-[print(v) for v in list(res.keys())]
+[print(v) for v in list(res.items())]
 
 list(res.keys())[-1]
 

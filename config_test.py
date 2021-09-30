@@ -1,4 +1,4 @@
-DATASET=('fmnist',)
+DATASET=('mnist','fmnist',)
 TGT_EPOCHS=(0,)
 PCT=(20,)
 EPS=(1.0,)

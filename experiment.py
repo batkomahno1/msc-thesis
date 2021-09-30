@@ -439,6 +439,7 @@ class Experiment(abc.ABC):
     def make_imgs(self, p, itr=0, nb_samples=2048):
         """Generate images and put them in /tmp/cln and /tmp/adv. Former are originals, later are fake."""
         c, pct = get_hyper_param(p)
+        # TODO: hacky when clean GANs are considered
         tgt_class = p[0]
 
         self._data_to_GPU()
@@ -447,8 +448,7 @@ class Experiment(abc.ABC):
             labels = self.LongTensor(np.array([tgt_class]*nb_samples, dtype=np.int))
         else:
             labels = self.LongTensor(
-                [self.classes[np.random.randint(len(self.classes))]
-                    for i in range(nb_samples)]
+                [self.classes[np.random.randint(len(self.classes))] for i in range(nb_samples)]
             )
         z_adv = self._generate(nb_samples, c, pct, itr=itr, labels = labels)
 
@@ -456,6 +456,8 @@ class Experiment(abc.ABC):
         # if no labels, then random picks
         matching = lambda e: torch.where(self.targets==e)[0]
         idxs = [matching(e)[0].item() for e in labels if len(matching(e)) > 0]
+
+        assert all(labels == self.targets[idxs])
         assert len(idxs) == labels.shape[0]
 
         paths = self.CLN_IMGS_DIR, self.ADV_IMGS_DIR
@@ -472,6 +474,8 @@ class Experiment(abc.ABC):
         # save some samples for evaluation
         name = self.RESULTS + 'PSND_FAKES_'+OUTPUT_ID.format(c, pct, itr)+'.png'
         save_image(z_adv[:25].detach().cpu(), name, nrow=5, normalize=True)
+        name = self.RESULTS + 'ORIGINAL_INPUT'+OUTPUT_ID.format(c, pct, itr)+'.png'
+        save_image(self.data[idxs][:25].detach().cpu(), name, nrow=5, normalize=True)
 
         # don't need vars stored in GPU memory anymore, release them!
         self._data_to_CPU()
@@ -524,6 +528,8 @@ class Experiment(abc.ABC):
             if self.verbose: print('Building clean GAN...')
             self._build_gan(dataset, itr=itr, save=True)
             if self.verbose: print('Clean GAN built')
+        else:
+            if self.verbose: print('Clean GAN loaded')
 
         # init GAN models
         self._init_gan_models()
@@ -536,9 +542,12 @@ class Experiment(abc.ABC):
         # _check_mem()
 
         # build adv gan
-        if self.verbose: print('Building PSND GAN...')
-        self._build_gan(params, itr=itr)
-        if self.verbose: print('PSND Gan built')
+        if not self.check_gan(params, itr=itr, epoch=None):
+            if self.verbose: print('Building PSND GAN...')
+            self._build_gan(params, itr=itr)
+            if self.verbose: print('PSND Gan built')
+        else:
+            if self.verbose: print('PSND Gan loaded')
 
         # plot and visualize the results
         self._plot_D(params, itr=itr)

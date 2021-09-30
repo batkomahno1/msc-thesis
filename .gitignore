@@ -149,9 +149,10 @@ tmp
 gpus.pkl
 
 tests
-
+test*
 experiment_results
-
+secrets.py
+reports
 output
 tuning
 tuning.py

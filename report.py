@@ -3,20 +3,19 @@ from os.path import isfile, join
 import pickle5 as pickle
 from statistics import mean
 
-path = 'downloads/'
-files = [f for f in listdir(path) if isfile(join(path, f)) if 'run' in f or 'results' in f]
-menu = {i:f for i,f in enumerate(files)}
+paths = 'experiment_results/', 'downloads/'
+sources = 'local', 'remote'
 
 try:
-    choice = 1#int(input(f'Choose file: {menu}'))
+    menu = {i:p for i,p in enumerate(sources)}
+    choice = int(input(f'Choose file: {menu}'))
 except ValueError:
     print("Not a number")
 
-if choice > len(files) or choice < 0: raise ValueError('Wrong file choice.')
-print('Loading: ', files[choice])
-
-file = path+files[choice]
-# file
+source = sources[choice]
+path = paths[choice]
+file = path+'results.pkl'
+print('Loading: ', file)
 
 with open(file, 'rb') as f:
     results = pickle.load(f)
@@ -25,46 +24,51 @@ with open(file, 'rb') as f:
 gans = set([v[0] for v in results.keys()])
 params = set([v[1] for v in results.keys()])
 iterations = set([v[-1] for v in results.keys()])
-
-gans, iterations = [sorted(list(l)) for l in [gans, iterations]]
-params_sorted = sorted(params, key = lambda v: (v[0],v[-1],v[1],v[2]) if isinstance(v, tuple) else (0,0,0,0))
-params_sorted
 datasets = ['mnist', 'fmnist']
 
-# accumulate data s.t. accum[gan, param] = list of fids
+gans, iterations = [sorted(list(l)) for l in [gans, iterations]]
+params
+# params = sorted(params, key = lambda v: (v[0],v[-1],v[1],v[2]) if isinstance(v, tuple) else (0,0,0,0))
+# params
+
+# accumulate data s.t. accum[gan, param] = avg of fids
 accum = dict()
 for g in gans:
     for p in params:
         var = [v[0] for k, v in results.items() if k[0] == g and k[1] == p]
         # skip p's that don't apply to a give g
         if len(var) > 0:
-            accum[g,p] = mean(var)
+            if isinstance(p, str):
+                accum[g,p] = var
+            else:
+                accum[g,p[2:4]+p[-3:-2]+p[-1:]] = var
 
-# plot this for each gan
-# %matplotlib
+var = list({v for _,v in accum.keys()})
+var
+
+params_reduced = sorted(var, key = lambda v: (v,0,0,0) if isinstance(v, str) else (v[2],v[0],v[3],v[1]))
+params_reduced
 import matplotlib.pyplot as plt
-fig, axs = plt.subplots(len(gans), 2, figsize=(10,10), sharex=True)
+fig, axs = plt.subplots(max(len(gans),2), 2, figsize=(10,10), sharex=False)
 fig.autofmt_xdate(rotation=45)
+idx_d = lambda d: 0 if d=='mnist' else 1
 for i, g in enumerate(gans):
-    axs[i,0].set_ylabel(g)
-    for j, d in enumerate(datasets):
-        axs[0,j].set_title(d)
-        x, y = [], []
-        for p in params:
-            if (g, p) in list(accum.keys()) and d in p:
-                print(g,d,p, round(accum[g,p]))
-                if isinstance(p, str):
-                    x.append('clean')
-                else:
-                    x.append(str(p[:-4]+p[-1:]))#str(p[:0]+p[2:4]+p[-1:]))
-                y.append(accum[g,p])
-        # print([not isinstance(v,float) for v in y])
-        # print([len(v)==2 for v in x])
-        axs[i,j].scatter(x,y)
-        # print(x)
-plt.savefig('tmp/res.png')
-plt.show()
-p
+    axs[i,0].set_ylabel(g.upper())
+    axs[0,0].set_title('mnist'.upper())
+    axs[0,1].set_title('fmnist'.upper())
+    x, y = ([],[]), ([],[])
+    for p in params_reduced:
+        #   if not isinstance(p,str):
+            d = p if isinstance(p,str) else p[2]
+            x[idx_d(d)].append(str(p))
+            y[idx_d(d)].append(accum[g,p])
+    for idx in [0,1]:
+        print(y, x)
+        print(y[idx], x[idx])
+        axs[i, idx].boxplot(y[idx], labels=x[idx])
+        # [tick.set_rotation(15) for tick in axs[i, idx].get_xticklabels()]
+plt.savefig('reports/'+source+'-report.png')
 
-[v for k,v in accum.items() if not isinstance(v, float)]
-accum['cgan',(-1, 0, 10, 0.0, True, 'mnist', 'inf', 'earlyStop')]
+[accum[g, 'mnist'] for g in gans]
+{g:mean([results[g, 'fmnist', i][0] for  i in range(5)]) for g in gans}
+{g:mean([results[g, 'mnist', i][0] for  i in range(5)]) for g in gans}

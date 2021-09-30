@@ -1,3 +1,11 @@
+"""
+THIS MODULE WILL:
+1. FIND THE LAST ITERATION
+2. CHECK THAT ALL SETS OF PARAMS ARE AT THE SAME ITERATION
+3. CONTINUE BUILDING CLN AND ADV GANS MID-ITERATION.
+4. MEASURE FIDs FROM SCRATCH
+NOTE: TO BUILD GANS FROM SCRATCH ONE MUST USE THE RESET OPTION
+"""
 # NOTE: CYCLE THROUGH ARCHITECTURES SO THAT ABLE TO STOP/RESUME ITERATIONS
 import itertools
 import time
@@ -48,16 +56,18 @@ if opt.nb_gpus > 0 and torch.cuda.is_available():
 # Initialize architectures
 var = [Experiment_WGAN, Experiment_WGAN_GP, Experiment_CGAN, Experiment_ACGAN]
 val = ['wgan', 'wgan_gp', 'cgan', 'acgan']
+# var = [Experiment_ACGAN]
+# val = ['acgan']
+
+ITERATIONS = opt.nb_iter
 if not opt.test:
     from config import *
-    ITERATIONS = opt.nb_iter
     EXPERIMENTS = [v(epochs = GAN_SETTINGS[name][0], batch_size=GAN_SETTINGS[name][1], \
                     verbose=opt.verbose, device=device) for v, name in zip(var, val)]
 else:
     from config_test import *
     opt.verbose=True
-    ITERATIONS = 1
-    epochs = 5
+    epochs = 50
     EXPERIMENTS = [v(epochs = epochs, batch_size=1000, verbose=opt.verbose, device=device) for v in var]
 
 # reset if necessary
@@ -133,7 +143,7 @@ for itr in range(iter_start, iter_start + ITERATIONS):
             result[(gan_name, params, itr)] = fid, time.time()-start
         # calculate clean FID here
         for dataset in DATASET:
-            # TODO: FORGOT TO RESTART THE TIMER!
+            start = time.time()
             if opt.verbose: print('Calculating clean FID')
             fid = exp._measure_FID(dataset, itr=itr)
             result[(gan_name, dataset, itr)] = fid, time.time()-start
