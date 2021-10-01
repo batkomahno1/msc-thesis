@@ -51,6 +51,8 @@ else:
 FloatTensor = lambda *args: torch.FloatTensor(*args).to(device) if cuda else torch.FloatTensor(*args)
 LongTensor = lambda *args: torch.LongTensor(*args).to(device) if cuda else torch.LongTensor(*args)
 
+get_dict = lambda v: v.state_dict() if len(os.environ["CUDA_VISIBLE_DEVICES"])<2 else v.module.state_dict()
+
 def weights_init_normal(m):
     classname = m.__class__.__name__
     if classname.find("Conv") != -1:
@@ -246,12 +248,12 @@ for epoch in range(opt.n_epochs):
     # NOTE: I added this
     if opt.save_epochs:
         os.makedirs("weights", exist_ok=True)
-        torch.save(discriminator.module.state_dict(), './weights/d_'+opt.output_id+'_epoch_'+str(epoch)+'.pth')
-        torch.save(generator.module.state_dict(), './weights/g_'+opt.output_id+'_epoch_'+str(epoch)+'.pth')
+        torch.save(get_dict(discriminator), './weights/d_'+opt.output_id+'_epoch_'+str(epoch)+'.pth')
+        torch.save(get_dict(generator), './weights/g_'+opt.output_id+'_epoch_'+str(epoch)+'.pth')
 
 os.makedirs("weights", exist_ok=True)
 name_d = './weights/d_'+opt.output_id+'_epoch_'+str(epoch)+'.pth'
 name_g = './weights/g_'+opt.output_id+'_epoch_'+str(epoch)+'.pth'
 
-torch.save(discriminator.module.state_dict(), name_d)
-torch.save(generator.module.state_dict(), name_g)
+torch.save(get_dict(discriminator), name_d)
+torch.save(get_dict(generator), name_g)

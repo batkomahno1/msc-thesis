@@ -51,6 +51,8 @@ else:
 
 Tensor = lambda *args: torch.FloatTensor(*args).to(device) if cuda else torch.FloatTensor(*args)
 
+get_dict = lambda v: v.state_dict() if len(os.environ["CUDA_VISIBLE_DEVICES"])<2 else v.module.state_dict()
+
 class Generator(nn.Module):
     def __init__(self):
         super(Generator, self).__init__()
@@ -188,13 +190,13 @@ for epoch in range(opt.n_epochs):
 
     # NOTE: I added this
     if opt.save_epochs:
-        print(opt.save_epochs)
-        torch.save(discriminator.module.state_dict(), './weights/d_'+opt.output_id+'_epoch_'+str(epoch)+'.pth')
-        torch.save(generator.module.state_dict(), './weights/g_'+opt.output_id+'_epoch_'+str(epoch)+'.pth')
+        os.makedirs("weights", exist_ok=True)
+        torch.save(get_dict(discriminator), './weights/d_'+opt.output_id+'_epoch_'+str(epoch)+'.pth')
+        torch.save(get_dict(generator), './weights/g_'+opt.output_id+'_epoch_'+str(epoch)+'.pth')
 
-
+os.makedirs("weights", exist_ok=True)
 name_d = './weights/d_'+opt.output_id+'_epoch_'+str(epoch)+'.pth'
 name_g = './weights/g_'+opt.output_id+'_epoch_'+str(epoch)+'.pth'
 
-torch.save(discriminator.module.state_dict(), name_d)
-torch.save(generator.module.state_dict(), name_g)
+torch.save(get_dict(discriminator), name_d)
+torch.save(get_dict(generator), name_g)

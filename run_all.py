@@ -1,11 +1,10 @@
-"""
-THIS MODULE WILL:
-1. FIND THE LAST ITERATION
-2. CHECK THAT ALL SETS OF PARAMS ARE AT THE SAME ITERATION
-3. CONTINUE BUILDING CLN AND ADV GANS MID-ITERATION.
-4. MEASURE FIDs FROM SCRATCH
-NOTE: TO BUILD GANS FROM SCRATCH ONE MUST USE THE RESET OPTION
-"""
+# THIS MODULE WILL:
+# 1. FIND THE LAST ITERATION
+# 2. CHECK THAT ALL SETS OF PARAMS ARE AT THE SAME ITERATION
+# 3. CONTINUE BUILDING CLN AND ADV GANS MID-ITERATION.
+# 4. MEASURE FIDs FROM SCRATCH
+# NOTE: TO BUILD GANS FROM SCRATCH ONE MUST USE THE RESET OPTION
+
 # NOTE: CYCLE THROUGH ARCHITECTURES SO THAT ABLE TO STOP/RESUME ITERATIONS
 import itertools
 import time
@@ -26,8 +25,10 @@ parser.add_argument("--nb_iter", type=int, default=1, help="number of iterations
 parser.add_argument("--verbose", type=lambda v: v=='True', default=False, help="verbose")
 parser.add_argument("--test", type=lambda v: v=='True', default=False, help="measure runtimes")
 parser.add_argument("--nb_gpus", type=int, default=4, help="number of gpus to be used")
-parser.add_argument("--reset", type=lambda v: v=='True', default=False, help="measure runtimes")
+parser.add_argument("--download", type=lambda v: v=='True', default=False, help="download weights")
+parser.add_argument("--reset", type=lambda v: v=='True', default=False, help="delete previous exp data")
 opt = parser.parse_args()
+print(opt)
 
 # start logging
 logging.basicConfig(filename='experiment.log', level=logging.INFO)
@@ -56,19 +57,18 @@ if opt.nb_gpus > 0 and torch.cuda.is_available():
 # Initialize architectures
 var = [Experiment_WGAN, Experiment_WGAN_GP, Experiment_CGAN, Experiment_ACGAN]
 val = ['wgan', 'wgan_gp', 'cgan', 'acgan']
-# var = [Experiment_ACGAN]
-# val = ['acgan']
+GAN_CHOICES = {name:var[i] for i,name in enumerate(val)}
 
 ITERATIONS = opt.nb_iter
 if not opt.test:
     from config import *
-    EXPERIMENTS = [v(epochs = GAN_SETTINGS[name][0], batch_size=GAN_SETTINGS[name][1], \
-                    verbose=opt.verbose, device=device) for v, name in zip(var, val)]
+    EXPERIMENTS = [GAN_CHOICES[name](epochs = GAN_SETTINGS[name][0], batch_size=GAN_SETTINGS[name][1], \
+                    verbose=opt.verbose, device=device) for name in GAN_CHOICE]
 else:
-    from config_test import *
     opt.verbose=True
-    epochs = 50
-    EXPERIMENTS = [v(epochs = epochs, batch_size=1000, verbose=opt.verbose, device=device) for v in var]
+    from config_test import *
+    EXPERIMENTS = [GAN_CHOICES[name](epochs = GAN_SETTINGS[name][0], batch_size=GAN_SETTINGS[name][1], \
+                    verbose=opt.verbose, device=device) for name in GAN_CHOICE]
 
 # reset if necessary
 if opt.reset:
@@ -129,7 +129,17 @@ result = dict()
 for itr in range(iter_start, iter_start + ITERATIONS):
     for exp in EXPERIMENTS:
         gan_name = exp.GAN_NAME
+
+        # calculate clean FID here
+        for dataset in DATASET:
+            if (gan_name, dataset, itr) not in result.keys():
+                if opt.verbose: print('Calculating clean FID')
+                start = time.time()
+                fid_cln = exp.run_cln(dataset, itr=itr, download=opt.download)
+                result[(gan_name, dataset, itr)] = fid_cln, time.time()-start
         arch_family = [k for k,v in ARCH_FAMILIES.items() if gan_name in v][0]
+
+        # calculate psnd FID here
         for params in PARAM_SET[arch_family]:
             if not opt.test and exp.check_gan(params, itr=itr):
                 raise RuntimeError('Overwriting an epxeriment!')
@@ -139,15 +149,7 @@ for itr in range(iter_start, iter_start + ITERATIONS):
                 logging.info(f'Experiment {params} skipped!.')
                 continue
             start = time.time()
-            fid = exp.run(params, itr=itr)
+            fid = exp.run(params, itr=itr, download=opt.download)
             result[(gan_name, params, itr)] = fid, time.time()-start
-            # calculate clean FID here
-            # avoid over-counting clean FIDs
-            dataset = params[-3]
-            if (gan_name, dataset, itr) not in result.keys():
-                if opt.verbose: print('Calculating clean FID')
-                start = time.time()
-                fid_cln = exp._measure_FID(dataset, itr=itr)
-                result[(gan_name, dataset, itr)] = fid_cln, time.time()-start
     # save at the end of an iteration
     save_res(result)

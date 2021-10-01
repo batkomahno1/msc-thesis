@@ -505,8 +505,22 @@ class Experiment(abc.ABC):
                 shutil.rmtree(path)
             os.makedirs(path)
 
-    def run(self, params, itr=0):
-        """Returns a FID score"""
+    def download(self, params, itr=0, epoch=None):
+        from secrets import SERVER_NAME
+        if epoch is None: epoch = self.EPOCHS-1
+        c,pct=get_hyper_param(params)
+        server_path = self.gan_g_path.format(c,pct,itr,epoch).replace(self.DIR, SERVER_NAME+':msc-thesis/')
+        local_path = self.gan_g_path.format(c,pct,itr,epoch)
+        if self.verbos:
+            print('server_path:'+server_path)
+            print('local_path:'+local_path)
+        # sleep to prevent flooding!
+        time.sleep(1)
+        proc = subprocess.run(["scp", server_path, local_path])
+        proc.check_returncode()
+
+    def run(self, params, itr=0, download=False):
+        """Returns a FID score. If PSND GAN already exists, it will simply re-do the FID"""
         # start experiment
         logging.info(f'Starting experiment: {self.GAN_NAME} {params} iteration {itr}.')
         start = time.time()
@@ -523,8 +537,11 @@ class Experiment(abc.ABC):
         self._load_raw_data(dataset_name=dataset)
         if self.verbose: print('Data loaded')
 
+        # download clean GAN
+        if download: self.download(dataset, itr=itr, epoch=self.EPOCHS-1)
+
         # build clean gan
-        if not self.check_gan(dataset, itr=itr, epoch=None):
+        if not self.check_gan(dataset, itr=itr, epoch=self.EPOCHS-1):
             if self.verbose: print('Building clean GAN...')
             self._build_gan(dataset, itr=itr, save=True)
             if self.verbose: print('Clean GAN built')
@@ -535,28 +552,75 @@ class Experiment(abc.ABC):
         self._init_gan_models()
         if self.verbose: print('Models initialized')
 
-        # make adv nb_samples
-        if self.verbose: print('Crafting adv samples...')
-        self._make_samples(params, itr=itr)
-        if self.verbose: print('Adv samples created')
-        # _check_mem()
+        # download psnd GAN
+        if download: self.download(params, itr=itr, epoch=self.EPOCHS-1)
 
-        # build adv gan
-        if not self.check_gan(params, itr=itr, epoch=None):
+        # check if the GAN was already created
+        if not self.check_gan(params, itr=itr, epoch=self.EPOCHS-1):
+            # make adv nb_samples
+            if self.verbose: print('Crafting adv samples...')
+            self._make_samples(params, itr=itr)
+            if self.verbose: print('Adv samples created')
+
+            # build adv gan
             if self.verbose: print('Building PSND GAN...')
             self._build_gan(params, itr=itr)
             if self.verbose: print('PSND Gan built')
+
+            # plot and visualize the results
+            self._plot_D(params, itr=itr)
+            self._visualize_samples(params, itr=itr)
+            if self.verbose: print('Plots and images generated')
         else:
             if self.verbose: print('PSND Gan loaded')
-
-        # plot and visualize the results
-        self._plot_D(params, itr=itr)
-        self._visualize_samples(params, itr=itr)
-        if self.verbose: print('Plots and images generated')
 
         # get fid score
         if self.verbose: print('Calculating FID...')
         fid = self._measure_FID(params, itr=itr)
+        if self.verbose: print('FID Calculated')
+
+        # log the experiment
+        logging.info(f'Experiment complete. Runtime: {(time.time()-start)//60}m.')
+
+        return fid
+
+    def run_cln(self, dataset, itr=0, download=False):
+        """Same as run above, except for clean GANs"""
+        # check if the paramter is correct
+        if not isinstance(dataset, str):
+            raise ValueError('Input must be datset and iteration.')
+
+        # start experiment
+        logging.info(f'Starting experiment: {self.GAN_NAME} {dataset} iteration {itr}.')
+        start = time.time()
+
+        # TODO: CHECK THIS
+        # don't need vars stored in GPU memory anymore, release them!
+        torch.cuda.empty_cache()
+
+        #load data
+        if self.verbose: print('Loading data...')
+        self._load_raw_data(dataset_name=dataset)
+        if self.verbose: print('Data loaded')
+
+        # download clean GAN
+        if download: self.download(dataset, itr=itr, epoch=self.EPOCHS-1)
+
+        # build clean gan
+        if not self.check_gan(dataset, itr=itr, epoch=self.EPOCHS-1):
+            if self.verbose: print('Building clean GAN...')
+            self._build_gan(dataset, itr=itr, save=True)
+            if self.verbose: print('Clean GAN built')
+        else:
+            if self.verbose: print('Clean GAN loaded')
+
+        # init GAN models
+        self._init_gan_models()
+        if self.verbose: print('Models initialized')
+
+        # get fid score
+        if self.verbose: print('Calculating FID...')
+        fid = self._measure_FID(dataset, itr=itr)
         if self.verbose: print('FID Calculated')
 
         # log the experiment
