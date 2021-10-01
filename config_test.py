@@ -17,7 +17,7 @@ GAN_SETTINGS = {
 'wgan':(1,1000)
 }
 
-
+# # check if FIDs are same as during prototyping
 # GAN_CHOICE = ['acgan']
 # GAN_SETTINGS = {
 # 'acgan':(50,64),

@@ -511,7 +511,7 @@ class Experiment(abc.ABC):
         c,pct=get_hyper_param(params)
         server_path = self.gan_g_path.format(c,pct,itr,epoch).replace(self.DIR, SERVER_NAME+':msc-thesis/')
         local_path = self.gan_g_path.format(c,pct,itr,epoch)
-        if self.verbos:
+        if self.verbose:
             print('server_path:'+server_path)
             print('local_path:'+local_path)
         # sleep to prevent flooding!
