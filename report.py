@@ -72,7 +72,3 @@ for i, g in enumerate(gans):
         axs[i, idx].boxplot(y[idx], labels=x[idx])
         # [tick.set_rotation(15) for tick in axs[i, idx].get_xticklabels()]
 plt.savefig('reports/'+source+'-report.png')
-
-[accum[g, 'mnist'] for g in gans]
-{g:mean([results[g, 'fmnist', i][0] for  i in range(5)]) for g in gans}
-{g:mean([results[g, 'mnist', i][0] for  i in range(5)]) for g in gans}

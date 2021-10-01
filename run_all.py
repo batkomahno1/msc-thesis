@@ -107,6 +107,13 @@ PARAM_SET['CONDITIONAL'] = get_params(tgt_class, TGT_EPOCHS, PCT, EPS, TARGETED,
 
 if opt.verbose: print('Starting runs...')
 
+# helper method
+def all_equal(iterable):
+    "Returns True if all the elements are equal to each other"
+    "Source: python doc"
+    g = groupby(iterable)
+    return next(g, True) and not next(g, False)
+
 # find last iterarion
 # it will overwrite half finished ITERATIONS
 # consistency check: every parameter set was run the same number of times
@@ -114,13 +121,12 @@ iter_start = 0
 if os.path.isfile(RUN_PATH_CURR):
     with open(RUN_PATH_CURR, 'rb') as f:
         var = pickle.load(f)
-        # the last element accounts for clean gans
-        nb_exps_per_iter = sum([len(ARCH_FAMILIES[v])*len(PARAM_SET[v]) for v in PARAM_SET.keys()]) + \
-                                                                                        len(EXPERIMENTS)
+        # list of iterations ie. [0,0,0,1,1,1,...] from result.pkl
         iter_list = [k[-1] for k in var.keys()]
-        if not all([nb_exps_per_iter == v for v in Counter(iter_list).values()]):
-            raise RuntimeError('Inconsistent num. of iterations per experiment!', \
-                                    Counter(iter_list), nb_exps_per_iter)
+        # experiments per iteration
+        iter_count = Counter(iter_list)
+        if not all_equal(iter_count.values()):
+            raise RuntimeError('Inconsistent num. of iterations per experiment!', iter_count)
         iter_start = max(iter_list) + 1
         if opt.verbose: print('Resuming at iteration', iter_start)
 
