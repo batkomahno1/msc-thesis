@@ -108,6 +108,7 @@ PARAM_SET['CONDITIONAL'] = get_params(tgt_class, TGT_EPOCHS, PCT, EPS, TARGETED,
 if opt.verbose: print('Starting runs...')
 
 # helper method
+from itertools import groupby
 def all_equal(iterable):
     "Returns True if all the elements are equal to each other"
     "Source: python doc"
