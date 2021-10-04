@@ -132,6 +132,7 @@ class Experiment(abc.ABC):
         self.test_model = None
 
         # these make sure the num of i/o values interfaces with this class
+        # define them in the super class per architecture
         self.G_decorator = lambda G: lambda z, kwargs: G(z) if G_decorator is None else G_decorator
         self.D_decorator = lambda D: lambda X, kwargs: D(X) if D_decorator is None else D_decorator
         self.adv_decorator = lambda D: lambda *args: D(args[0]) if adv_decorator is None else adv_decorator
@@ -144,7 +145,7 @@ class Experiment(abc.ABC):
             self.loss = loss(self.DEVICE)
 
     def _load_raw_data(self, mean=0.5, std=0.5, dataset_name='mnist'):
-        # TODO: THIS RESIZING IS A HUGE PROBLEM!! FIX IT
+        # TODO: THIS RESIZING IS A PROBLEM!! FIX IT
         if not all([os.path.isfile(v.format(dataset_name, 0, 0)) for v in [self.data_path, self.targets_path]]):
             if dataset_name=='mnist':
                 dataset = datasets.MNIST(
@@ -237,7 +238,6 @@ class Experiment(abc.ABC):
     def _generate(self, nb_samples, c, pct, itr=0, epoch=None, **kwargs):
         """
         Input: nb_samples, c, pct, itr=0, epoch=None, *args
-        Note: Generator i/o depends on GAN arch
         """
         if epoch is None: epoch = self.EPOCHS-1
 
@@ -566,13 +566,13 @@ class Experiment(abc.ABC):
             if self.verbose: print('Building PSND GAN...')
             self._build_gan(params, itr=itr)
             if self.verbose: print('PSND Gan built')
-
-            # plot and visualize the results
-            self._plot_D(params, itr=itr)
-            self._visualize_samples(params, itr=itr)
-            if self.verbose: print('Plots and images generated')
         else:
-            if self.verbose: print('PSND Gan loaded')
+            if self.verbose: print('PSND GAN loaded')
+
+        # plot and visualize the results
+        self._plot_D(params, itr=itr)
+        self._visualize_samples(params, itr=itr)
+        if self.verbose: print('Plots and images generated')
 
         # get fid score
         if self.verbose: print('Calculating FID...')
