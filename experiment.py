@@ -474,7 +474,7 @@ class Experiment(abc.ABC):
         # save some samples for evaluation
         name = self.RESULTS + 'PSND_FAKES_'+OUTPUT_ID.format(c, pct, itr)+'.png'
         save_image(z_adv[:25].detach().cpu(), name, nrow=5, normalize=True)
-        name = self.RESULTS + 'ORIGINAL_INPUT'+OUTPUT_ID.format(c, pct, itr)+'.png'
+        name = self.RESULTS + 'ORIGINAL_INPUT_'+OUTPUT_ID.format(c, pct, itr)+'.png'
         save_image(self.data[idxs][:25].detach().cpu(), name, nrow=5, normalize=True)
 
         # don't need vars stored in GPU memory anymore, release them!

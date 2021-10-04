@@ -70,6 +70,7 @@ else:
     EXPERIMENTS = [GAN_CHOICES[name](epochs = GAN_SETTINGS[name][0], batch_size=GAN_SETTINGS[name][1], \
                     verbose=opt.verbose, device=device) for name in GAN_CHOICE]
 
+logging.info(f'Settings: {GAN_SETTINGS}')
 # reset if necessary
 if opt.reset:
     for exp in EXPERIMENTS:
