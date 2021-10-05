@@ -23,6 +23,9 @@ import inspect
 sys.path.append(os.path.join(os.getcwd(), 'external/advertorch'))
 from advertorch.attacks import LinfPGDAttack
 
+import importlib
+defense_gan = importlib.import_module("external.DefenseGAN-Pytorch.util_defense_GAN")
+
 OUTPUT_ID = 'param_{}_pct_{}_iter_{}'
 HYPERPARAM = 'tgt_{}_epoch_{}_eps_{}_tgted_{}_set_{}_atk_{}_note_{}'
 
@@ -131,10 +134,13 @@ class Experiment(abc.ABC):
         self.G = None
         self.test_model = None
 
-        # these make sure the num of i/o values interfaces with this class
+        # these make sure the num of i/o values interfaces with other class
         # define them in the super class per architecture
+        # TODO: I think these are called interfaces, not decorators
+        # ALWAYS PASS (X/NOISE, LABELS) TO D_decorator AND G_decorator
         self.G_decorator = lambda G: lambda z, kwargs: G(z) if G_decorator is None else G_decorator
         self.D_decorator = lambda D: lambda X, kwargs: D(X) if D_decorator is None else D_decorator
+        # TODO: This one seems to be doing the same thing as D_decorator
         self.adv_decorator = lambda D: lambda *args: D(args[0]) if adv_decorator is None else adv_decorator
 
         # set default loss
@@ -235,9 +241,10 @@ class Experiment(abc.ABC):
         D.eval()
         return D
 
+    # TODO: rename kargs to labels as there is no other possible choice
     def _generate(self, nb_samples, c, pct, itr=0, epoch=None, **kwargs):
         """
-        Input: nb_samples, c, pct, itr=0, epoch=None, *args
+        kwargs contain labels only
         """
         if epoch is None: epoch = self.EPOCHS-1
 
@@ -255,6 +262,7 @@ class Experiment(abc.ABC):
 
         return output
 
+    # TODO: rename kargs to labels as there is no other possible choice
     def _discriminate(self, X, c, pct, itr=0, epoch=None, **kwargs):
         """
         Input: X, c, pct, itr=0, epoch=None, *args
@@ -627,3 +635,71 @@ class Experiment(abc.ABC):
         logging.info(f'Experiment complete. Runtime: {(time.time()-start)//60}m.')
 
         return fid
+
+    def detect(self, params, itr=0, download=False):
+        """Retuns"""
+        if isinstance(params, str):
+            raise ValueError('PSND GAN missing.')
+
+        # start experiment
+        logging.info(f'Starting detector: {self.GAN_NAME} {params} iteration {itr}.')
+        start = time.time()
+
+        # TODO: CHECK THIS
+        # don't need vars stored in GPU memory anymore, release them!
+        torch.cuda.empty_cache()
+
+        # set dataset
+        dataset = params[-3]
+
+        #load data
+        if self.verbose: print('Loading data...')
+        self._load_raw_data(dataset_name=dataset)
+        if self.verbose: print('Data loaded')
+
+        # download clean GAN
+        if download: self.download(dataset, itr=itr, epoch=self.EPOCHS-1)
+
+        # build clean gan
+        if not self.check_gan(dataset, itr=itr, epoch=self.EPOCHS-1):
+            raise ValueError('Clean GAN not found.')
+        else:
+            if self.verbose: print('Clean GAN loaded')
+
+        # init GAN models
+        self._init_gan_models()
+        if self.verbose: print('Models initialized')
+
+        # download psnd GAN
+        if download: self.download(params, itr=itr, epoch=self.EPOCHS-1)
+
+        # check if the GAN was already created
+        if not self.check_gan(params, itr=itr, epoch=self.EPOCHS-1):
+            raise ValueError('PSND GAN not found.')
+        else:
+            if self.verbose: print('PSND GAN loaded')
+
+        # set defgan params
+        # TODO: make these class constants?
+        learning_rate = 10.0
+
+        # get data with adv samples
+        X, y = [v.to(self.DEVICE) for v in self._load_adv_data(params, itr=itr)]
+
+        # use mse loss b/c comparing images not probabilities/logits
+        loss = nn.MSELoss()
+
+        # prepare a generator with an interface for whatever GAN arch I use
+        dataset = params[-3]
+        G = self.G_decorator(self._load_generator(dataset, 0, itr=itr).to(self.DEVICE))
+
+        # get a set of optimal z's
+        _, z_hats = defense_gan.get_z_sets(G, X, y, learning_rate, loss, device, input_latent = self.LATENT_DIM)
+
+        # find min loss
+        min_loss = min([loss(G(z, y), X) for z in z_hats]).item()
+
+        # log the experiment
+        logging.info(f'Detection complete. Runtime: {(time.time()-start)//60}m.')
+
+        return min_loss
