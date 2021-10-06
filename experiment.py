@@ -700,7 +700,7 @@ class Experiment(abc.ABC):
         G = self.G_decorator(G0)
 
         # get a set of optimal z's
-        _, z_hats = defense_gan.get_z_sets(G, X, y, learning_rate, loss, self.DEVICE, \
+        _, z_hats = defense_gan.get_z_sets(G, X, {'labels':y}, learning_rate, loss, self.DEVICE, \
                                                             input_latent = self.LATENT_DIM)
 
         # free memory
@@ -708,17 +708,17 @@ class Experiment(abc.ABC):
 
         # possible memory issues, choose device
         device = 'cpu'#self.DEVICE
-        X, y, z_hats, G0 = [v.to(device) for v in [X, y, z_hats, G0]]
+        X, y, z_hats, G0, loss = [v.to(device) for v in [X, y, z_hats, G0, loss]]
 
         # get losses for different z's
-        losses = torch.Tensor([loss(G(z, y), X).cpu() for z in z_hats])
+        losses = torch.Tensor([loss(G(z, {'labels':y}), X).cpu() for z in z_hats])
 
         # find index of z*
         min_idx = torch.argmin(losses).cpu().item()
 
         # calculate MSE for each image vs z*
         # TODO: speed this up with matrix operations
-        A, B = G(z_hats[min_idx], y).squeeze(), X.squeeze()
+        A, B = G(z_hats[min_idx], {'labels':y}).squeeze(), X.squeeze()
         img_losses = torch.Tensor([loss(A[i], B[i]).cpu().item() for i in range(len(A))])
 
         # get idxs of adv samples - ground truth

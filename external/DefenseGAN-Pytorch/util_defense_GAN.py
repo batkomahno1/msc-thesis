@@ -47,7 +47,7 @@ def get_z_sets(model, data, labels, lr, loss, device, rec_iter = 200, rec_rr = 1
         for iteration in range(rec_iter):
 
             optimizer.zero_grad()
-
+            # print(labels)
             fake_image = model(z_hat, labels)
 
             # TODO: check if I really need this line
