@@ -51,8 +51,9 @@ def get_z_sets(model, data, labels, lr, loss, device, rec_iter = 200, rec_rr = 1
             fake_image = model(z_hat, labels)
 
             # TODO: check if I really need this line
+            # print('>>>', fake_image.shape)
             # fake_image = fake_image.view(-1, data.size(1), data.size(2), data.size(3))
-
+            # print(fake_image.shape, '<<<')
             reconstruct_loss = loss(fake_image, data)
 
             reconstruct_loss.backward()

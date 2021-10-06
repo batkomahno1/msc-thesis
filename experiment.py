@@ -1,4 +1,5 @@
 import os
+assert os.environ["CUDA_DEVICE_ORDER"]=="PCI_BUS_ID"
 import torch
 import torch.nn as nn
 
@@ -685,21 +686,84 @@ class Experiment(abc.ABC):
 
         # get data with adv samples
         X, y = [v.to(self.DEVICE) for v in self._load_adv_data(params, itr=itr)]
+        # X, y = X[:100], y[:100] # TODO: REMOVE THIS!!!!!!!!!
 
         # use mse loss b/c comparing images not probabilities/logits
         loss = nn.MSELoss()
 
         # prepare a generator with an interface for whatever GAN arch I use
         dataset = params[-3]
-        G = self.G_decorator(self._load_generator(dataset, 0, itr=itr).to(self.DEVICE))
+        G0 = self._load_generator(dataset, 0, itr=itr).to(self.DEVICE)
+        # TODO: TEST THIS!!
+        if torch.cuda.device_count() > 1:
+            G0 = nn.DataParallel(G0)
+        G = self.G_decorator(G0)
 
         # get a set of optimal z's
-        _, z_hats = defense_gan.get_z_sets(G, X, y, learning_rate, loss, device, input_latent = self.LATENT_DIM)
+        _, z_hats = defense_gan.get_z_sets(G, X, y, learning_rate, loss, self.DEVICE, \
+                                                            input_latent = self.LATENT_DIM)
 
-        # find min loss
-        min_loss = min([loss(G(z, y), X) for z in z_hats]).item()
+        # free memory
+        torch.cuda.empty_cache()
+
+        # possible memory issues, choose device
+        device = 'cpu'#self.DEVICE
+        X, y, z_hats, G0 = [v.to(device) for v in [X, y, z_hats, G0]]
+
+        # get losses for different z's
+        losses = torch.Tensor([loss(G(z, y), X).cpu() for z in z_hats])
+
+        # find index of z*
+        min_idx = torch.argmin(losses).cpu().item()
+
+        # calculate MSE for each image vs z*
+        # TODO: speed this up with matrix operations
+        A, B = G(z_hats[min_idx], y).squeeze(), X.squeeze()
+        img_losses = torch.Tensor([loss(A[i], B[i]).cpu().item() for i in range(len(A))])
+
+        # get idxs of adv samples - ground truth
+        c, pct  = get_hyper_param(params)
+        y_true = torch.zeros_like(self.targets)
+        adv_idxs = torch.load(self.idxs_path.format(c, pct, itr))
+        y_true[adv_idxs] = 1
+        y_true = to_numpy_squeeze(y_true)
+        # y_true = y_true[:100] # TODO: REMOVE THIS!!!!!!!!!
+
+        # normalize losses
+        losses /= losses.max()
+        img_losses /= img_losses.max()
+
+        # finda max loss
+        max_loss = max(losses.max().cpu().item(), img_losses.max().cpu().item())
+
+        # get predictions for different thetas
+        thetas = np.linspace(0, 1)
+        y_preds = [(img_losses > theta).to(torch.int) for theta in thetas]
+        y_preds = [to_numpy_squeeze(v) for v in y_preds]
+
+        # some checks
+        assert max_loss <= 1.0, max_loss
+        assert all(y_pred.shape==y_true.shape for y_pred in y_preds)
+
+        # get confusion matrices for each theta
+        # matrix is like: tn, fp, fn, tp
+        # https://stackoverflow.com/a/25009504
+        from sklearn.metrics import confusion_matrix
+        conf_mats = [confusion_matrix(y_true, y_pred).ravel() for y_pred in y_preds]
+        fprs, tprs = [m[1]/(m[1]+m[0]) for m in conf_mats], [m[-1]/(m[-1]+m[-2]) for m in conf_mats]
+
+        auc = np.trapz(*(sorted(v) for v in [tprs, fprs]))
+
+        from sklearn.metrics import roc_curve
+        plt.plot(fprs, tprs, label=dataset+', auc='+str(round(auc,2)))
+        # plt.plot(thetas, thetas, '--', label='thetas')
+        plt.xlabel('FPR')
+        plt.ylabel('TPR')
+        plt.legend()
+        name = self.RESULTS + 'ROC_'+OUTPUT_ID.format(c, pct, itr)+'.svg'
+        plt.savefig(name)
 
         # log the experiment
-        logging.info(f'Detection complete. Runtime: {(time.time()-start)//60}m.')
+        logging.info(f'Detection complete. AUC:{auc} Runtime: {(time.time()-start)//60}m.')
 
-        return min_loss
+        return auc
