@@ -1,4 +1,5 @@
 import os
+assert os.environ["CUDA_DEVICE_ORDER"]=="PCI_BUS_ID"
 import torch
 import torch.nn as nn
 
@@ -8,6 +9,7 @@ from torchvision.utils import save_image
 
 import numpy as np
 import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix
 
 import gc
 import abc
@@ -22,6 +24,9 @@ import inspect
 # TODO: this is a very hack way to import this libarry
 sys.path.append(os.path.join(os.getcwd(), 'external/advertorch'))
 from advertorch.attacks import LinfPGDAttack
+
+import importlib
+defense_gan = importlib.import_module("external.DefenseGAN-Pytorch.util_defense_GAN")
 
 OUTPUT_ID = 'param_{}_pct_{}_iter_{}'
 HYPERPARAM = 'tgt_{}_epoch_{}_eps_{}_tgted_{}_set_{}_atk_{}_note_{}'
@@ -131,10 +136,13 @@ class Experiment(abc.ABC):
         self.G = None
         self.test_model = None
 
-        # these make sure the num of i/o values interfaces with this class
+        # these make sure the num of i/o values interfaces with other class
         # define them in the super class per architecture
+        # TODO: I think these are called interfaces, not decorators
+        # ALWAYS PASS (X/NOISE, LABELS) TO D_decorator AND G_decorator
         self.G_decorator = lambda G: lambda z, kwargs: G(z) if G_decorator is None else G_decorator
         self.D_decorator = lambda D: lambda X, kwargs: D(X) if D_decorator is None else D_decorator
+        # TODO: This one seems to be doing the same thing as D_decorator
         self.adv_decorator = lambda D: lambda *args: D(args[0]) if adv_decorator is None else adv_decorator
 
         # set default loss
@@ -235,9 +243,10 @@ class Experiment(abc.ABC):
         D.eval()
         return D
 
+    # TODO: rename kargs to labels as there is no other possible choice
     def _generate(self, nb_samples, c, pct, itr=0, epoch=None, **kwargs):
         """
-        Input: nb_samples, c, pct, itr=0, epoch=None, *args
+        kwargs contain labels only
         """
         if epoch is None: epoch = self.EPOCHS-1
 
@@ -255,6 +264,7 @@ class Experiment(abc.ABC):
 
         return output
 
+    # TODO: rename kargs to labels as there is no other possible choice
     def _discriminate(self, X, c, pct, itr=0, epoch=None, **kwargs):
         """
         Input: X, c, pct, itr=0, epoch=None, *args
@@ -627,3 +637,139 @@ class Experiment(abc.ABC):
         logging.info(f'Experiment complete. Runtime: {(time.time()-start)//60}m.')
 
         return fid
+
+    def detect(self, params, itr=0, download=False):
+        """Returns auc, fprs, tprs, thetas of detection and produces a ROC curve."""
+        if isinstance(params, str):
+            raise ValueError('PSND GAN missing.')
+
+        # start experiment
+        logging.info(f'Starting detector: {self.GAN_NAME} {params} iteration {itr}.')
+        start = time.time()
+
+        # TODO: CHECK THIS
+        # don't need vars stored in GPU memory anymore, release them!
+        torch.cuda.empty_cache()
+
+        # set dataset
+        dataset = params[-3]
+
+        #load data
+        if self.verbose: print('Loading data...')
+        self._load_raw_data(dataset_name=dataset)
+        if self.verbose: print('Data loaded')
+
+        # download clean GAN
+        if download: self.download(dataset, itr=itr, epoch=self.EPOCHS-1)
+
+        # build clean gan
+        if not self.check_gan(dataset, itr=itr, epoch=self.EPOCHS-1):
+            raise ValueError('Clean GAN not found.')
+        else:
+            if self.verbose: print('Clean GAN loaded')
+
+        # init GAN models
+        self._init_gan_models()
+        if self.verbose: print('Models initialized')
+
+        # download psnd GAN
+        if download: self.download(params, itr=itr, epoch=self.EPOCHS-1)
+
+        # check if the GAN was already created
+        if not self.check_gan(params, itr=itr, epoch=self.EPOCHS-1):
+            raise ValueError('PSND GAN not found.')
+        else:
+            if self.verbose: print('PSND GAN loaded')
+
+        # set defgan params
+        # TODO: make these class constants?
+        learning_rate = 10.0
+
+        # get data with adv samples
+        X, y = [v.to(self.DEVICE) for v in self._load_adv_data(params, itr=itr)]
+
+        # use mse loss b/c comparing images not probabilities/logits
+        loss = nn.MSELoss().to(self.DEVICE)
+
+        # prepare a generator with an interface for whatever GAN arch I use
+        dataset = params[-3]
+        G0 = self._load_generator(dataset, 0, itr=itr).to(self.DEVICE)
+        # TODO: TEST THIS!!
+        if torch.cuda.device_count() > 1:
+            G0 = nn.DataParallel(G0)
+        G = self.G_decorator(G0)
+
+        # get a set of optimal z's
+        z_hats = defense_gan.get_z_sets(G, X, {'labels':y}, learning_rate, loss, self.DEVICE, \
+                                                            input_latent = self.LATENT_DIM)[-1].to(self.DEVICE)
+
+        # free memory
+        torch.cuda.empty_cache()
+
+        with torch.no_grad():
+            # # possible memory issues, choose device
+            # device = self.DEVICE
+            # X, y, z_hats, loss = [v.to(device) for v in [X, y, z_hats, loss]]
+
+            # get losses for different z's
+            losses = torch.Tensor([loss(G(z, {'labels':y}), X).cpu() for z in z_hats])
+
+            # find index of z*
+            min_idx = torch.argmin(losses).cpu().item()
+
+            # calculate MSE for each image vs z*
+            # TODO: speed this up with matrix operations
+            A, B = G(z_hats[min_idx], {'labels':y}).squeeze(), X.squeeze()
+            img_losses = torch.Tensor([loss(A[i], B[i]).cpu().item() for i in range(len(A))])
+
+            # get idxs of adv samples - ground truth
+            c, pct  = get_hyper_param(params)
+            y_true = torch.zeros_like(self.targets)
+            adv_idxs = torch.load(self.idxs_path.format(c, pct, itr))
+            y_true[adv_idxs] = 1
+            y_true = to_numpy_squeeze(y_true)
+
+            # normalize losses
+            losses /= losses.max()
+            img_losses /= img_losses.max()
+
+            # finda max loss
+            max_loss = max(losses.max().cpu().item(), img_losses.max().cpu().item())
+
+            # get predictions for different thetas
+            thetas = np.linspace(0, 1)
+            y_preds = [(img_losses > theta).to(torch.int) for theta in thetas]
+            y_preds = [to_numpy_squeeze(v) for v in y_preds]
+
+            # some checks
+            assert max_loss <= 1.0, max_loss
+            assert all(y_pred.shape==y_true.shape for y_pred in y_preds)
+
+            # clean up memory
+            del X, y, z_hats, loss
+            torch.cuda.empty_cache()
+
+        # get confusion matrices for each theta
+        # matrix is like: tn, fp, fn, tp
+        # https://stackoverflow.com/a/25009504
+        conf_mats = [confusion_matrix(y_true, y_pred).ravel() for y_pred in y_preds]
+        # [print(m,'\n') for m in conf_mats]
+        fprs = [m[1]/(m[1]+m[0]) for m in conf_mats if len(m) > 1]
+        tprs = [m[-1]/(m[-1]+m[-2]) for m in conf_mats if len(m) > 1]
+
+        # calculate AUC
+        auc = np.trapz(*(sorted(v) for v in [tprs, fprs]))
+
+        # plot ROC curve
+        plt.plot(fprs, tprs, label=dataset+', auc='+str(round(auc,2)))
+        plt.xlabel('FPR')
+        plt.ylabel('TPR')
+        plt.legend()
+        name = self.RESULTS + 'ROC_'+OUTPUT_ID.format(c, pct, itr)+'.svg'
+        plt.savefig(name)
+        plt.close()
+
+        # log the experiment
+        logging.info(f'Detection complete. AUC:{auc} Runtime: {(time.time()-start)//60}m.')
+
+        return auc, fprs, tprs, thetas

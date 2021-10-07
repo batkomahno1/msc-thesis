@@ -40,9 +40,9 @@ class Experiment_CGAN(Experiment):
 
         # set some default attributes
         if 'G_decorator' not in kwargs.keys():
-            self.G_decorator = lambda G: lambda z, kwargs: G(z, kwargs['labels'].to(self.DEVICE))
+            self.G_decorator = lambda G: lambda z, kwargs: G(z, kwargs['labels'])#.to(self.DEVICE))
         if 'D_decorator' not in kwargs.keys():
-            self.D_decorator = lambda D: lambda X, kwargs: D(X, kwargs['labels'].to(self.DEVICE))
+            self.D_decorator = lambda D: lambda X, kwargs: D(X, kwargs['labels'])#.to(self.DEVICE))
         if 'adv_decorator' not in kwargs.keys():
             self.adv_decorator = lambda D: lambda *args: D(args[0], args[1])
 
