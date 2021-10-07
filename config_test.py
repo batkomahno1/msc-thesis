@@ -8,7 +8,7 @@ NOTE=('earlyStop',)
 
 # # select GANs to be tested
 # GAN_CHOICE = ['wgan', 'wgan_gp', 'cgan', 'acgan']
-GAN_CHOICE = ['cgan', 'acgan', 'wgan', 'wgan_gp']
+GAN_CHOICE = ['acgan', 'cgan', 'wgan', 'wgan_gp']
 
 # # gan name : epochs, batch size
 # GAN_SETTINGS = {

@@ -9,6 +9,7 @@ from torchvision.utils import save_image
 
 import numpy as np
 import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix
 
 import gc
 import abc
@@ -638,7 +639,7 @@ class Experiment(abc.ABC):
         return fid
 
     def detect(self, params, itr=0, download=False):
-        """Retuns"""
+        """Returns auc, fprs, tprs, thetas of detection and produces a ROC curve."""
         if isinstance(params, str):
             raise ValueError('PSND GAN missing.')
 
@@ -686,10 +687,9 @@ class Experiment(abc.ABC):
 
         # get data with adv samples
         X, y = [v.to(self.DEVICE) for v in self._load_adv_data(params, itr=itr)]
-        # X, y = X[:100], y[:100] # TODO: REMOVE THIS!!!!!!!!!
 
         # use mse loss b/c comparing images not probabilities/logits
-        loss = nn.MSELoss()
+        loss = nn.MSELoss().to(self.DEVICE)
 
         # prepare a generator with an interface for whatever GAN arch I use
         dataset = params[-3]
@@ -700,70 +700,76 @@ class Experiment(abc.ABC):
         G = self.G_decorator(G0)
 
         # get a set of optimal z's
-        _, z_hats = defense_gan.get_z_sets(G, X, {'labels':y}, learning_rate, loss, self.DEVICE, \
-                                                            input_latent = self.LATENT_DIM)
+        z_hats = defense_gan.get_z_sets(G, X, {'labels':y}, learning_rate, loss, self.DEVICE, \
+                                                            input_latent = self.LATENT_DIM)[-1].to(self.DEVICE)
 
         # free memory
         torch.cuda.empty_cache()
 
-        # possible memory issues, choose device
-        device = 'cpu'#self.DEVICE
-        X, y, z_hats, G0, loss = [v.to(device) for v in [X, y, z_hats, G0, loss]]
+        with torch.no_grad():
+            # # possible memory issues, choose device
+            # device = self.DEVICE
+            # X, y, z_hats, loss = [v.to(device) for v in [X, y, z_hats, loss]]
 
-        # get losses for different z's
-        losses = torch.Tensor([loss(G(z, {'labels':y}), X).cpu() for z in z_hats])
+            # get losses for different z's
+            losses = torch.Tensor([loss(G(z, {'labels':y}), X).cpu() for z in z_hats])
 
-        # find index of z*
-        min_idx = torch.argmin(losses).cpu().item()
+            # find index of z*
+            min_idx = torch.argmin(losses).cpu().item()
 
-        # calculate MSE for each image vs z*
-        # TODO: speed this up with matrix operations
-        A, B = G(z_hats[min_idx], {'labels':y}).squeeze(), X.squeeze()
-        img_losses = torch.Tensor([loss(A[i], B[i]).cpu().item() for i in range(len(A))])
+            # calculate MSE for each image vs z*
+            # TODO: speed this up with matrix operations
+            A, B = G(z_hats[min_idx], {'labels':y}).squeeze(), X.squeeze()
+            img_losses = torch.Tensor([loss(A[i], B[i]).cpu().item() for i in range(len(A))])
 
-        # get idxs of adv samples - ground truth
-        c, pct  = get_hyper_param(params)
-        y_true = torch.zeros_like(self.targets)
-        adv_idxs = torch.load(self.idxs_path.format(c, pct, itr))
-        y_true[adv_idxs] = 1
-        y_true = to_numpy_squeeze(y_true)
-        # y_true = y_true[:100] # TODO: REMOVE THIS!!!!!!!!!
+            # get idxs of adv samples - ground truth
+            c, pct  = get_hyper_param(params)
+            y_true = torch.zeros_like(self.targets)
+            adv_idxs = torch.load(self.idxs_path.format(c, pct, itr))
+            y_true[adv_idxs] = 1
+            y_true = to_numpy_squeeze(y_true)
 
-        # normalize losses
-        losses /= losses.max()
-        img_losses /= img_losses.max()
+            # normalize losses
+            losses /= losses.max()
+            img_losses /= img_losses.max()
 
-        # finda max loss
-        max_loss = max(losses.max().cpu().item(), img_losses.max().cpu().item())
+            # finda max loss
+            max_loss = max(losses.max().cpu().item(), img_losses.max().cpu().item())
 
-        # get predictions for different thetas
-        thetas = np.linspace(0, 1)
-        y_preds = [(img_losses > theta).to(torch.int) for theta in thetas]
-        y_preds = [to_numpy_squeeze(v) for v in y_preds]
+            # get predictions for different thetas
+            thetas = np.linspace(0, 1)
+            y_preds = [(img_losses > theta).to(torch.int) for theta in thetas]
+            y_preds = [to_numpy_squeeze(v) for v in y_preds]
 
-        # some checks
-        assert max_loss <= 1.0, max_loss
-        assert all(y_pred.shape==y_true.shape for y_pred in y_preds)
+            # some checks
+            assert max_loss <= 1.0, max_loss
+            assert all(y_pred.shape==y_true.shape for y_pred in y_preds)
+
+            # clean up memory
+            del X, y, z_hats, loss
+            torch.cuda.empty_cache()
 
         # get confusion matrices for each theta
         # matrix is like: tn, fp, fn, tp
         # https://stackoverflow.com/a/25009504
-        from sklearn.metrics import confusion_matrix
         conf_mats = [confusion_matrix(y_true, y_pred).ravel() for y_pred in y_preds]
-        fprs, tprs = [m[1]/(m[1]+m[0]) for m in conf_mats], [m[-1]/(m[-1]+m[-2]) for m in conf_mats]
+        # [print(m,'\n') for m in conf_mats]
+        fprs = [m[1]/(m[1]+m[0]) for m in conf_mats if len(m) > 1]
+        tprs = [m[-1]/(m[-1]+m[-2]) for m in conf_mats if len(m) > 1]
 
+        # calculate AUC
         auc = np.trapz(*(sorted(v) for v in [tprs, fprs]))
 
-        from sklearn.metrics import roc_curve
+        # plot ROC curve
         plt.plot(fprs, tprs, label=dataset+', auc='+str(round(auc,2)))
-        # plt.plot(thetas, thetas, '--', label='thetas')
         plt.xlabel('FPR')
         plt.ylabel('TPR')
         plt.legend()
         name = self.RESULTS + 'ROC_'+OUTPUT_ID.format(c, pct, itr)+'.svg'
         plt.savefig(name)
+        plt.close()
 
         # log the experiment
         logging.info(f'Detection complete. AUC:{auc} Runtime: {(time.time()-start)//60}m.')
 
-        return auc
+        return auc, fprs, tprs, thetas

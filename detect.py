@@ -142,7 +142,7 @@ for itr in range(iter_start, iter_start + ITERATIONS):
                 logging.info(f'Experiment {params} skipped!.')
                 continue
             start = time.time()
-            thetas = exp.detect(params, itr=itr, download=opt.download)
-            result[(gan_name, params, itr)] = thetas, time.time()-start
+            auc, fprs, tprs, thetas = exp.detect(params, itr=itr, download=opt.download)
+            result[(gan_name, params, itr)] = auc, fprs, tprs, thetas, time.time()-start
     # save at the end of an iteration
     save_res(result)

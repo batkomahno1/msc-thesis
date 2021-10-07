@@ -36,8 +36,6 @@ def get_z_sets(model, data, labels, lr, loss, device, rec_iter = 200, rec_rr = 1
         z_hat = torch.randn(data.size(0), input_latent).to(device)
         z_hat = z_hat.detach().requires_grad_()
 
-        # labels = torch.LongTensor(np.array([tgt_class]*nb_samples, dtype=np.int)).to(device)
-
         cur_lr = lr
 
         optimizer = optim.SGD([z_hat], lr = cur_lr, momentum = 0.7)
@@ -47,7 +45,7 @@ def get_z_sets(model, data, labels, lr, loss, device, rec_iter = 200, rec_rr = 1
         for iteration in range(rec_iter):
 
             optimizer.zero_grad()
-            # print(labels)
+
             fake_image = model(z_hat, labels)
 
             # TODO: check if I really need this line
