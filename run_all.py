@@ -4,8 +4,8 @@
 # 3. CONTINUE BUILDING CLN AND ADV GANS MID-ITERATION.
 # 4. MEASURE FIDs FROM SCRATCH
 # NOTE: TO BUILD GANS FROM SCRATCH ONE MUST USE THE RESET OPTION
-
 # NOTE: CYCLE THROUGH ARCHITECTURES SO THAT ABLE TO STOP/RESUME ITERATIONS
+
 import itertools
 import time
 import os
@@ -26,7 +26,8 @@ parser.add_argument("--verbose", type=lambda v: v=='True', default=False, help="
 parser.add_argument("--test", type=lambda v: v=='True', default=False, help="measure runtimes")
 parser.add_argument("--nb_gpus", type=int, default=4, help="number of gpus to be used")
 parser.add_argument("--download", type=lambda v: v=='True', default=False, help="download weights")
-parser.add_argument("--reset", type=lambda v: v=='True', default=False, help="delete previous exp data")
+parser.add_argument("--reset", type=lambda v: v=='True', default=False, help="redo everything")
+parser.add_argument("--reset_soft", type=lambda v: v=='True', default=False, help="redo fids and visuals")
 opt = parser.parse_args()
 print(opt)
 
@@ -71,10 +72,6 @@ else:
                     verbose=opt.verbose, device=device) for name in GAN_CHOICE]
 
 logging.info(f'Settings: {GAN_SETTINGS}')
-# reset if necessary
-if opt.reset:
-    for exp in EXPERIMENTS:
-        exp.reset()
 
 ARCH_FAMILIES = {'WASSERSTEIN':('wgan', 'wgan_gp'), 'CONDITIONAL':('cgan', 'acgan')}
 PARAM_SET = {}
@@ -83,11 +80,18 @@ RES_DIR =  os.getcwd() + '/experiment_results/'
 RUN_PATH = RES_DIR + RUN_NAME + '.pkl'
 RUN_PATH_CURR = RES_DIR + 'results.pkl'
 
+# reset if necessary
 if opt.reset:
     if os.path.exists(RES_DIR):
         shutil.rmtree(RES_DIR)
+    for exp in EXPERIMENTS:
+        exp.reset()
 
+# create results dir if necessary
 if not os.path.exists(RES_DIR): os.makedirs(RES_DIR)
+
+# delete fids file
+if opt.reset_soft and os.path.isfile(RUN_PATH_CURR): os.remove(RUN_PATH_CURR)
 
 def get_params(*args):
     return list(itertools.product(*args))
@@ -149,7 +153,7 @@ for itr in range(iter_start, iter_start + ITERATIONS):
 
         # calculate psnd FID here
         for params in PARAM_SET[arch_family]:
-            if not opt.test and exp.check_gan(params, itr=itr):
+            if exp.check_gan(params, itr=itr) and not opt.test and not opt.reset_soft:
                 raise RuntimeError('Overwriting an epxeriment!')
             if opt.verbose: print(gan_name, params, itr)
             eps, note = params[3], params[-1]

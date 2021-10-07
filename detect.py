@@ -1,11 +1,10 @@
 # THIS MODULE WILL:
-# 1. FIND THE LAST ITERATION
-# 2. CHECK THAT ALL SETS OF PARAMS ARE AT THE SAME ITERATION
-# 3. CONTINUE BUILDING CLN AND ADV GANS MID-ITERATION.
-# 4. MEASURE FIDs FROM SCRATCH
-# NOTE: TO BUILD GANS FROM SCRATCH ONE MUST USE THE RESET OPTION
-
+# 1. FIND THE LAST COMPLETE ITERATION
+# 2. CHECK THAT ALL SETS OF PARAMS ARE AT THE SAME ITERATION# 3. CONTINUE BUILDING CLN AND ADV GANS MID-ITERATION.
+# 3. DETECT ADV SAMPLES
+# NOTE: MODULE ASSUMES THAT GANS WHERE ALREADY CREATED!
 # NOTE: CYCLE THROUGH ARCHITECTURES SO THAT ABLE TO STOP/RESUME ITERATIONS
+
 import itertools
 import time
 import os
@@ -26,7 +25,7 @@ parser.add_argument("--verbose", type=lambda v: v=='True', default=False, help="
 parser.add_argument("--test", type=lambda v: v=='True', default=False, help="measure runtimes")
 parser.add_argument("--nb_gpus", type=int, default=4, help="number of gpus to be used")
 parser.add_argument("--download", type=lambda v: v=='True', default=False, help="download weights")
-parser.add_argument("--reset", type=lambda v: v=='True', default=False, help="delete previous exp data")
+parser.add_argument("--reset", type=lambda v: v=='True', default=False, help="redo detection")
 opt = parser.parse_args()
 print(opt)
 

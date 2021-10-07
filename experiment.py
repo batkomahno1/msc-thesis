@@ -753,7 +753,6 @@ class Experiment(abc.ABC):
         # matrix is like: tn, fp, fn, tp
         # https://stackoverflow.com/a/25009504
         conf_mats = [confusion_matrix(y_true, y_pred).ravel() for y_pred in y_preds]
-        # [print(m,'\n') for m in conf_mats]
         fprs = [m[1]/(m[1]+m[0]) for m in conf_mats if len(m) > 1]
         tprs = [m[-1]/(m[-1]+m[-2]) for m in conf_mats if len(m) > 1]
 
