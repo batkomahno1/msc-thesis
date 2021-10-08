@@ -27,7 +27,7 @@ parser.add_argument("--test", type=lambda v: v=='True', default=False, help="mea
 parser.add_argument("--nb_gpus", type=int, default=4, help="number of gpus to be used")
 parser.add_argument("--download", type=lambda v: v=='True', default=False, help="download weights")
 parser.add_argument("--reset", type=lambda v: v=='True', default=False, help="redo everything")
-parser.add_argument("--reset_soft", type=lambda v: v=='True', default=False, help="redo fids and visuals")
+parser.add_argument("--soft_reset", type=lambda v: v=='True', default=False, help="redo reports")
 opt = parser.parse_args()
 print(opt)
 
@@ -80,7 +80,7 @@ RES_DIR =  os.getcwd() + '/experiment_results/'
 RUN_PATH = RES_DIR + RUN_NAME + '.pkl'
 RUN_PATH_CURR = RES_DIR + 'results.pkl'
 
-# reset if necessary
+# delete all old data
 if opt.reset:
     if os.path.exists(RES_DIR):
         shutil.rmtree(RES_DIR)
@@ -90,8 +90,12 @@ if opt.reset:
 # create results dir if necessary
 if not os.path.exists(RES_DIR): os.makedirs(RES_DIR)
 
-# delete fids file
-if opt.reset_soft and os.path.isfile(RUN_PATH_CURR): os.remove(RUN_PATH_CURR)
+# delete reports BUT not the weights nor adv samples
+if opt.soft_reset:
+    if os.path.isfile(RUN_PATH_CURR):
+        os.remove(RUN_PATH_CURR)
+    for exp in EXPERIMENTS:
+        exp.soft_reset()
 
 def get_params(*args):
     return list(itertools.product(*args))
@@ -153,7 +157,7 @@ for itr in range(iter_start, iter_start + ITERATIONS):
 
         # calculate psnd FID here
         for params in PARAM_SET[arch_family]:
-            if exp.check_gan(params, itr=itr) and not opt.test and not opt.reset_soft:
+            if exp.check_gan(params, itr=itr) and not opt.test and not opt.soft_reset:
                 raise RuntimeError('Overwriting an epxeriment!')
             if opt.verbose: print(gan_name, params, itr)
             eps, note = params[3], params[-1]
@@ -162,6 +166,8 @@ for itr in range(iter_start, iter_start + ITERATIONS):
                 continue
             start = time.time()
             fid = exp.run(params, itr=itr, download=opt.download)
-            result[(gan_name, params, itr)] = fid, time.time()-start
+            auc_roc = exp.detect(params, itr=itr, download=opt.download)
+            result[(gan_name, params, itr)] = fid, auc_roc, time.time()-start
     # save at the end of an iteration
     save_res(result)
+    logging.info(f'Iteration {itr} complete at {time.asctime()}')

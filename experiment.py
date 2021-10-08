@@ -509,8 +509,15 @@ class Experiment(abc.ABC):
         return fid
 
     def reset(self):
-        """Delete old data"""
+        """Delete ALL old data"""
         for path in self.CREATED_DIRS:
+            if os.path.exists(path):
+                shutil.rmtree(path)
+            os.makedirs(path)
+
+    def soft_reset(self):
+        """Delete previous results"""
+        for path in [self.RESULTS]:
             if os.path.exists(path):
                 shutil.rmtree(path)
             os.makedirs(path)
@@ -681,6 +688,7 @@ class Experiment(abc.ABC):
         else:
             if self.verbose: print('PSND GAN loaded')
 
+        if self.verbose: print('Running detector...')
         # set defgan params
         # TODO: make these class constants?
         learning_rate = 10.0
