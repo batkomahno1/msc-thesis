@@ -388,7 +388,7 @@ class Experiment(abc.ABC):
                               cwd = self.GAN_DIR)
         print(proc.stderr.decode('utf-8'))
         proc.check_returncode()
-        if self.verbose: print(proc.stdout.decode('utf-8'))
+        # if self.verbose: print(proc.stdout.decode('utf-8'))
         logging.info(f'Processed gan:{c} pct {pct} itr {itr} time {(time.time()-start)//60}m')
         return proc.stdout.decode('utf-8')
 
