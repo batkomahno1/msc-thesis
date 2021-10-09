@@ -4,3 +4,4 @@ scipy==1.5.4
 Pillow
 pytorch-fid
 tqdm
+scikit-learn
