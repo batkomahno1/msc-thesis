@@ -159,11 +159,11 @@ for itr in range(iter_start, iter_start + ITERATIONS):
         for params in PARAM_SET[arch_family]:
             if exp.check_gan(params, itr=itr) and not opt.test and not opt.soft_reset:
                 raise RuntimeError('Overwriting an epxeriment!')
-            if opt.verbose: print(gan_name, params, itr)
             eps, note = params[3], params[-1]
             if 'downgrade'==note.lower() and eps==0.0:
                 logging.info(f'Experiment {params} skipped!.')
                 continue
+            if opt.verbose: print(gan_name, params, itr)
             start = time.time()
             fid = exp.run(params, itr=itr, download=opt.download)
             auc_roc = exp.detect(params, itr=itr, download=opt.download)
