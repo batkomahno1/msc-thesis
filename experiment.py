@@ -309,7 +309,7 @@ class Experiment(abc.ABC):
         # set targets
         y = self.FloatTensor(self.data.shape[0], 1).fill_(0.0).to(self.DEVICE)
         if 'noise' in note.lower():
-            X[idxs_small_part] = torch.rand_like(self.data[:idxs_small_part.shape[0]])
+            X[idxs_small_part] = torch.rand_like(self.data[:idxs_small_part.shape[0]]).to(self.DEVICE)
             y[idxs_small_part] = 1.0
         elif 'earlystop'  in note.lower():
             n, var = idxs_small_part.shape[0], labels[idxs_small_part].to(self.DEVICE).detach().clone()
