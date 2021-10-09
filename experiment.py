@@ -704,7 +704,9 @@ class Experiment(abc.ABC):
         G0 = self._load_generator(dataset, 0, itr=itr).to(self.DEVICE)
         # TODO: TEST THIS!!
         if torch.cuda.device_count() > 1:
-            G0 = nn.DataParallel(G0)
+            devices = [int(v) for v in os.environ["CUDA_DEVICE_ORDER"].replace(' ', '').split(',')][1:]
+            if self.verbose: print('Running on GPUs: ', devices)
+            G0 = nn.DataParallel(G0, device_ids=devices)
         G = self.G_decorator(G0)
 
         # get a set of optimal z's
