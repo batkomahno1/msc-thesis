@@ -3,7 +3,7 @@ from os.path import isfile, join
 import pickle5 as pickle
 from statistics import mean
 
-paths = 'experiment_results/', 'downloads/'
+paths = 'experiment_results/', 'downloads/experiment_results/'
 sources = 'local', 'remote'
 
 try:
@@ -27,7 +27,7 @@ iterations = set([v[-1] for v in results.keys()])
 datasets = ['mnist', 'fmnist']
 
 gans, iterations = [sorted(list(l)) for l in [gans, iterations]]
-params
+# params
 # params = sorted(params, key = lambda v: (v[0],v[-1],v[1],v[2]) if isinstance(v, tuple) else (0,0,0,0))
 # params
 
@@ -44,10 +44,10 @@ for g in gans:
                 accum[g,p[2:4]+p[-3:-2]+p[-1:]] = var
 
 var = list({v for _,v in accum.keys()})
-var
+# var
 
 params_reduced = sorted(var, key = lambda v: (v,0,0,0) if isinstance(v, str) else (v[2],v[0],v[3],v[1]))
-params_reduced
+# params_reduced
 import matplotlib.pyplot as plt
 import numpy as np
 fig, axs = plt.subplots(len(gans), 2, figsize=(10,10), sharex=False)
@@ -60,8 +60,8 @@ fig.autofmt_xdate(rotation=45)
 idx_d = lambda d: 0 if d=='mnist' else 1
 for i, g in enumerate(gans):
     axs[i,0].set_ylabel(g.upper())
-    axs[0,0].set_title('mnist'.upper())
-    axs[0,1].set_title('fmnist'.upper())
+    axs[0,0].set_title('mnist'.upper()+'\n n='+str(max(iterations)))
+    axs[0,1].set_title('fmnist'.upper()+'\n n='+str(max(iterations)))
     x, y = ([],[]), ([],[])
     for p in params_reduced:
         #   if not isinstance(p,str):

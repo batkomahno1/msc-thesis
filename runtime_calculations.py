@@ -31,7 +31,7 @@ def get_runtime(run_times=None, nb_sets = 2, nb_iter = 5, nb_pct = 2, nb_eps = 2
 from os import listdir
 from os.path import isfile, join
 import pickle5 as pickle
-path = 'downloads/'
+path = 'downloads/experiment_results/'
 files = [f for f in listdir(path) if isfile(join(path, f)) if 'run' in f or 'results' in f]
 menu = {i:f for i,f in enumerate(files)}
 
@@ -55,7 +55,7 @@ with open(file, 'rb') as f:
 from statistics import mean
 
 # res
-[print(v) for v in list(res.items())]
+# [print(v) for v in list(res.items())]
 
 list(res.keys())[-1]
 
@@ -96,9 +96,10 @@ nb_params = 2, 10, 2, 2, 2
 #EMPIRICALLY IT'S CLOSER TO 4GB PER ITERATION PLUS UPFORNT COST OF ABOUT 12 GB
 get_storage(*nb_params)
 
-print('Empirical estimate:')
+print('#'*25+'Empirical estimate:'+'#'*25)
 get_runtime(run_times, *nb_params)
 
+print('#'*25+'Guesstimating:'+'#'*25)
 gans = ['wgan','wgan_gp','cgan','acgan']
 var = [7,8,5,7]
 run_times = lambda var: dict(zip(gans, var))
