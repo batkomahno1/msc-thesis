@@ -33,7 +33,9 @@ HYPERPARAM = 'tgt_{}_epoch_{}_eps_{}_tgted_{}_set_{}_atk_{}_note_{}'
 
 IMPLEMENTED_ARCHS = ['cgan','acgan','wgan','wgan_gp']
 CONDITIONAL_ARCHS = ['cgan', 'acgan']
-#IMG_SHAPE = (1, 28, 28)
+
+# THIS IS APPROX 20% OF A SINGLE CLASS
+DETECTOR_SAMPLE_SIZE = 1000
 
 def get_hyper_param(p):
     if isinstance(p, str) :
@@ -654,17 +656,11 @@ class Experiment(abc.ABC):
         logging.info(f'Starting detector: {self.GAN_NAME} {params} iteration {itr}.')
         start = time.time()
 
-        # TODO: CHECK THIS
         # don't need vars stored in GPU memory anymore, release them!
         torch.cuda.empty_cache()
 
         # set dataset
         dataset = params[-3]
-
-        #load data
-        if self.verbose: print('Loading data...')
-        self._load_raw_data(dataset_name=dataset)
-        if self.verbose: print('Data loaded')
 
         # download clean GAN
         if download: self.download(dataset, itr=itr, epoch=self.EPOCHS-1)
@@ -689,15 +685,31 @@ class Experiment(abc.ABC):
             if self.verbose: print('PSND GAN loaded')
 
         if self.verbose: print('Running detector...')
-        # set defgan params
-        # TODO: make these class constants?
-        learning_rate = 10.0
 
         # get data with adv samples
         X, y = [v.to(self.DEVICE) for v in self._load_adv_data(params, itr=itr)]
 
-        # use mse loss b/c comparing images not probabilities/logits
-        loss = nn.MSELoss().to(self.DEVICE)
+        # get indecis of adv samples
+        tgt_class, c, pct  = params[0], *get_hyper_param(params)
+        adv_idxs = torch.load(self.idxs_path.format(c, pct, itr))
+        # TODO: VERIFY VALIDITY OF CHOOSING A SUBSET
+        nb_samples = min(len(adv_idxs), DETECTOR_SAMPLE_SIZE)
+        adv_idxs = np.random.choice(adv_idxs, nb_samples, replace=False)
+
+        if not isinstance(adv_idxs,np.ndarray): raise TypeError('Wrong type: '+type(adv_idxs))
+
+        # find indecis of clean samples
+        if tgt_class == -1:
+            cln_idxs = np.array(list(set(range(X.shape[0])) - set(adv_idxs)))
+        else:
+            all_idxs = to_numpy_squeeze(torch.where(y==tgt_class)[0])
+            cln_idxs = np.array(list(set(all_idxs) - set(adv_idxs)))
+
+        # randomly select as many cln indecis as adv ones
+        cln_idxs = np.random.choice(cln_idxs, len(adv_idxs), replace=False)
+
+        # combine adv and cln idxs
+        sel_idxs = np.sort(np.concatenate((cln_idxs,adv_idxs), axis=0))
 
         # prepare a generator with an interface for whatever GAN arch I use
         dataset = params[-3]
@@ -709,50 +721,54 @@ class Experiment(abc.ABC):
             G0 = nn.DataParallel(G0, device_ids=devices)
         G = self.G_decorator(G0)
 
+        # set defgan params
+        # TODO: make these class constants?
+        learning_rate = 10.0
+
+        # use mse loss b/c comparing images not probabilities/logits
+        loss = nn.MSELoss(reduction='none').to(self.DEVICE)
+
         # get a set of optimal z's
-        z_hats = defense_gan.get_z_sets(G, X, {'labels':y}, learning_rate, loss, self.DEVICE, \
-                                                            input_latent = self.LATENT_DIM)[-1].to(self.DEVICE)
+        # TODO: DOUBLE CHECK DOING THIS IN ONE GO VS FOR EACH IMAGE SEPERATELY!!!!!
+        if self.verbose: print('Finding z* candidates')
+        z_hats = defense_gan.get_z_sets(G, X[sel_idxs], {'labels':y[sel_idxs]}, learning_rate, loss, \
+                                        self.DEVICE, input_latent = self.LATENT_DIM)[-1].to(self.DEVICE)
 
         # free memory
         torch.cuda.empty_cache()
 
+        # find z* that minimizes losses in X
         with torch.no_grad():
             # # possible memory issues, choose device
             # device = self.DEVICE
             # X, y, z_hats, loss = [v.to(device) for v in [X, y, z_hats, loss]]
 
             # get losses for different z's
-            losses = torch.Tensor([loss(G(z, {'labels':y}), X).cpu() for z in z_hats])
+            losses = torch.Tensor([loss(G(z, {'labels':y[sel_idxs]}), X[sel_idxs]).cpu() for z in z_hats])
 
             # find index of z*
             min_idx = torch.argmin(losses).cpu().item()
 
             # calculate MSE for each image vs z*
             # TODO: speed this up with matrix operations
-            A, B = G(z_hats[min_idx], {'labels':y}).squeeze(), X.squeeze()
+            A, B = G(z_hats[min_idx], {'labels':y[sel_idxs]}).squeeze(), X[sel_idxs].squeeze()
             img_losses = torch.Tensor([loss(A[i], B[i]).cpu().item() for i in range(len(A))])
-
-            # get idxs of adv samples - ground truth
-            c, pct  = get_hyper_param(params)
-            y_true = torch.zeros_like(self.targets)
-            adv_idxs = torch.load(self.idxs_path.format(c, pct, itr))
-            y_true[adv_idxs] = 1
-            y_true = to_numpy_squeeze(y_true)
 
             # normalize losses
             losses /= losses.max()
             img_losses /= img_losses.max()
 
-            # finda max loss
-            max_loss = max(losses.max().cpu().item(), img_losses.max().cpu().item())
-
             # get predictions for different thetas
             thetas = np.linspace(0, 1)
-            y_preds = [(img_losses > theta).to(torch.int) for theta in thetas]
-            y_preds = [to_numpy_squeeze(v) for v in y_preds]
+            y_preds = [to_numpy_squeeze((img_losses > theta).to(torch.int)) for theta in thetas]
+
+            # get idxs of adv samples - ground truth
+            y_true = torch.zeros_like(y)
+            y_true[adv_idxs] = 1
+            # remove unsued indecis
+            y_true = to_numpy_squeeze(y_true)[sel_idxs]
 
             # some checks
-            assert max_loss <= 1.0, max_loss
             assert all(y_pred.shape==y_true.shape for y_pred in y_preds)
 
             # clean up memory

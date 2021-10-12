@@ -4,7 +4,7 @@ PCT=(20,)
 EPS=(1.0,) # try zero here
 TARGETED=(True,)
 ATK = ('inf',)
-NOTE=('noise',)
+NOTE=('earlyStop',)
 
 # # select GANs to be tested
 # GAN_CHOICE = ['wgan', 'wgan_gp', 'cgan', 'acgan']
@@ -19,7 +19,7 @@ NOTE=('noise',)
 # }
 
 # check if FIDs are same as during prototyping
-GAN_CHOICE = ['wgan']
+GAN_CHOICE = ['acgan']
 GAN_SETTINGS = {
 'acgan':(50,1000),
 'cgan':(100,500),

@@ -166,8 +166,8 @@ for itr in range(iter_start, iter_start + ITERATIONS):
             if opt.verbose: print(gan_name, params, itr)
             start = time.time()
             fid = exp.run(params, itr=itr, download=opt.download)
-            auc_roc = exp.detect(params, itr=itr, download=opt.download)
-            result[(gan_name, params, itr)] = fid, auc_roc, time.time()-start
+            detections = exp.detect(params, itr=itr, download=opt.download)
+            result[(gan_name, params, itr)] = fid, detections, time.time()-start
     # save at the end of an iteration
     save_res(result)
     logging.info(f'Iteration {itr} complete at {time.asctime()}')

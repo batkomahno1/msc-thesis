@@ -34,6 +34,9 @@ def get_z_sets(model, data, labels, lr, loss, device, rec_iter = 200, rec_rr = 1
     # the R random differernt initializations of z before L steps of GD
     z_hats_orig = torch.Tensor(rec_rr, data.size(0), input_latent)
 
+    # backup labels
+    labels_orig = labels['labels'].detach().cpu().clone()
+
     for idx in range(len(z_hats_recs)):
 
         z_hat = torch.randn(data.size(0), input_latent).to(device)
@@ -64,6 +67,9 @@ def get_z_sets(model, data, labels, lr, loss, device, rec_iter = 200, rec_rr = 1
             cur_lr = adjust_lr(optimizer, cur_lr, global_step = global_step, rec_iter= rec_iter)
 
         z_hats_recs[idx] = z_hat.cpu().detach().clone()
+
+        # make sure SGD doesn't change labels
+        assert all(labels_orig==labels['labels'].cpu().detach().clone())
 
     return z_hats_orig, z_hats_recs
 

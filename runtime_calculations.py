@@ -100,6 +100,9 @@ print('#'*25+'Empirical estimate:'+'#'*25)
 get_runtime(run_times, *nb_params)
 
 print('#'*25+'Guesstimating:'+'#'*25)
+run_times['acgan']=5
+get_runtime(run_times, *nb_params)
+
 gans = ['wgan','wgan_gp','cgan','acgan']
 var = [7,8,5,7]
 run_times = lambda var: dict(zip(gans, var))
