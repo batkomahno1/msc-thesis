@@ -726,11 +726,10 @@ class Experiment(abc.ABC):
         learning_rate = 10.0
 
         # use mse loss b/c comparing images not probabilities/logits
-        loss = nn.MSELoss(reduction='none').to(self.DEVICE)
+        loss = nn.MSELoss().to(self.DEVICE)
 
         # get a set of optimal z's
         # TODO: DOUBLE CHECK DOING THIS IN ONE GO VS FOR EACH IMAGE SEPERATELY!!!!!
-        if self.verbose: print('Finding z* candidates')
         z_hats = defense_gan.get_z_sets(G, X[sel_idxs], {'labels':y[sel_idxs]}, learning_rate, loss, \
                                         self.DEVICE, input_latent = self.LATENT_DIM)[-1].to(self.DEVICE)
 
