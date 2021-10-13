@@ -100,21 +100,8 @@ print('#'*25+'Empirical estimate:'+'#'*25)
 get_runtime(run_times, *nb_params)
 
 print('#'*25+'Guesstimating:'+'#'*25)
-run_times['acgan']=5
+var_low = [0.91, 1.0, 1.01, 2.73]
+
+for i,(k,v) in enumerate(run_times.items()): run_times[k]= round(v + var_low[i])
+
 get_runtime(run_times, *nb_params)
-
-gans = ['wgan','wgan_gp','cgan','acgan']
-var = [7,8,5,7]
-run_times = lambda var: dict(zip(gans, var))
-get_storage(*nb_params)
-# nb_params = 2, 1, 1, 2, 2
-get_runtime(run_times(var), *nb_params)
-
-var_ideal = [16,12//2+1,7,7]
-get_runtime(run_times(var_ideal), *nb_params)
-
-var_mid = [9,12//2+1,7,7/2+1] #(250, 100), (250, 50), (500,100), (1000, 50)
-get_runtime(run_times(var_mid), *nb_params)
-
-var_low = [5,12//2+1,7,7//2+1] #
-get_runtime(run_times(var_low), *nb_params)
