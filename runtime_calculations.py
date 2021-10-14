@@ -63,7 +63,7 @@ times = dict()
 for gan in set(v[0] for v in res.keys()):
     for data in set(v[1] for v in res.keys() if isinstance(v[1], str)):
         for pct in set(v[1][2] for v in res.keys() if not isinstance(v[1], str)):
-            times[gan,data,pct] = [v[-1] for k,v in res.items() if not isinstance(k[1], str) and k[0]==gan and k[1][5]==data and k[1][2]==pct]
+            times[gan,data,pct] = [v[-1] for k,v in res.items() if not isinstance(k[1], str) and k[0]==gan and k[1][5]==data and k[1][2]==pct][-4:]
         # times[gan,data,pct] = [v[-1] for k,v in res.items() if not isinstance(k[1], str) and k[0]==gan and k[1][5]==data and k[1][2]==pct]
 len([1 for v in res.keys() if v[-1]==0])/4
 

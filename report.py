@@ -60,13 +60,14 @@ fig.autofmt_xdate(rotation=45)
 idx_d = lambda d: 0 if d=='mnist' else 1
 for i, g in enumerate(gans):
     axs[i,0].set_ylabel(g.upper())
-    axs[0,0].set_title('mnist'.upper()+'\n n='+str(max(iterations)))
-    axs[0,1].set_title('fmnist'.upper()+'\n n='+str(max(iterations)))
+    axs[0,0].set_title('mnist'.upper()+'\n n='+str(max(iterations)+1))
+    axs[0,1].set_title('fmnist'.upper()+'\n n='+str(max(iterations)+1))
     x, y = ([],[]), ([],[])
     for p in params_reduced:
         #   if not isinstance(p,str):
             d = p if isinstance(p,str) else p[2]
-            x[idx_d(d)].append(str(p))
+            x_label = str(p[:2] + p[-1:]) if not isinstance(p,str) else 'clean'
+            x[idx_d(d)].append(x_label)
             y[idx_d(d)].append(accum[g,p])
     for idx in [0,1]:
         axs[i, idx].boxplot(y[idx], labels=x[idx])
