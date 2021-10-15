@@ -5,8 +5,20 @@ import torch.optim as optim
 import torch.utils.data
 from torch.autograd import Variable
 
-_logger = logging.getLogger(__name__)
+# _logger = logging.getLogger(__name__)
 
+# set gpu
+import os
+cuda = True if torch.cuda.is_available() else False
+if cuda:
+    gpu_id = os.environ["CUDA_VISIBLE_DEVICES"][0]
+    device = "cuda:" + gpu_id
+else:
+    device = "cpu"
+
+Tensor = lambda *args: torch.FloatTensor(*args).to(device) if cuda else torch.FloatTensor(*args)
+
+get_dict = lambda v: v.state_dict() if len(os.environ["CUDA_VISIBLE_DEVICES"])<2 else v.module.state_dict()
 
 class DPWGAN(object):
     """Class to store, train, and generate from a
@@ -31,7 +43,8 @@ class DPWGAN(object):
         self.noise_function = noise_function
 
     def train(self, data, epochs=100, n_critics=5, batch_size=128,
-              learning_rate=1e-4, sigma=None, weight_clip=0.1):
+              learning_rate=1e-4, sigma=None, weight_clip=0.1, meta_hook=None,
+              save_epochs=False, output_id=''):
         """Train the model
 
         Parameters
@@ -50,6 +63,9 @@ class DPWGAN(object):
             Amount of noise to add (for differential privacy)
         weight_clip : float
             Maximum range of weights (for differential privacy)
+        meta_hook: function
+            Returns a hook function that adds noise to gradients (for DP).
+            This is used to control the RV for simulations!
         """
         generator_solver = optim.RMSprop(
             self.generator.parameters(), lr=learning_rate
@@ -58,13 +74,15 @@ class DPWGAN(object):
             self.discriminator.parameters(), lr=learning_rate
         )
 
+        # default meta-hook
+        if meta_hook is None:
+            meta_hook = lambda batch_size, sigma, paramter: \
+                            lambda grad: grad + (1 / batch_size) * sigma * torch.randn(parameter.shape)
+
         # add hooks to introduce noise to gradient for differential privacy
         if sigma is not None:
             for parameter in self.discriminator.parameters():
-                parameter.register_hook(
-                    lambda grad: grad + (1 / batch_size) * sigma
-                    * torch.randn(parameter.shape)
-                )
+                parameter.register_hook(meta_hook(batch_size, sigma, paramter))
 
         # There is a batch for each critic (discriminator training iteration),
         # so each epoch is epoch_length iterations, and the total number of
@@ -119,15 +137,21 @@ class DPWGAN(object):
             self.generator.zero_grad()
             self.discriminator.zero_grad()
 
-            # Print training losses
             if int(iteration % epoch_length) == 0:
                 epoch = int(iteration / epoch_length)
-                _logger.info('Epoch {}\n'
-                             'Discriminator loss: {}; '
-                             'Generator loss: {}'
-                             .format(epoch,
-                                     discriminator_loss.data.numpy(),
-                                     generator_loss.data.numpy()))
+
+            # NOTE: I added this
+            if save_epochs and int(iteration % epoch_length) == 0:
+                os.makedirs("weights", exist_ok=True)
+                torch.save(get_dict(discriminator), './weights/d_'+output_id+'_epoch_'+str(epoch)+'.pth')
+                torch.save(get_dict(generator), './weights/g_'+output_id+'_epoch_'+str(epoch)+'.pth')
+
+        os.makedirs("weights", exist_ok=True)
+        name_d = './weights/d_'+output_id+'_epoch_'+str(epoch)+'.pth'
+        name_g = './weights/g_'+output_id+'_epoch_'+str(epoch)+'.pth'
+
+        torch.save(get_dict(discriminator), name_d)
+        torch.save(get_dict(generator), name_g)
 
     def generate(self, n):
         """Generate a synthetic data set using the trained model

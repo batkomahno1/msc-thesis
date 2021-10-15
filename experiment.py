@@ -1,5 +1,5 @@
 import os
-assert os.environ["CUDA_DEVICE_ORDER"]=="PCI_BUS_ID"
+# assert os.environ["CUDA_DEVICE_ORDER"]=="PCI_BUS_ID"
 import torch
 import torch.nn as nn
 
@@ -31,7 +31,7 @@ defense_gan = importlib.import_module("external.DefenseGAN-Pytorch.util_defense_
 OUTPUT_ID = 'param_{}_pct_{}_iter_{}'
 HYPERPARAM = 'tgt_{}_epoch_{}_eps_{}_tgted_{}_set_{}_atk_{}_note_{}'
 
-IMPLEMENTED_ARCHS = ['cgan','acgan','wgan','wgan_gp']
+IMPLEMENTED_ARCHS = ['cgan','acgan','wgan','wgan_gp', 'dpwgan']
 CONDITIONAL_ARCHS = ['cgan', 'acgan']
 
 # THIS IS APPROX 20% OF A SINGLE CLASS
@@ -538,71 +538,6 @@ class Experiment(abc.ABC):
         proc = subprocess.run(["scp", server_path, local_path])
         proc.check_returncode()
 
-    def run(self, params, itr=0, download=False):
-        """Returns a FID score. If PSND GAN already exists, it will simply re-do the FID"""
-        # start experiment
-        logging.info(f'Starting experiment: {self.GAN_NAME} {params} iteration {itr}.')
-        start = time.time()
-
-        # TODO: CHECK THIS
-        # don't need vars stored in GPU memory anymore, release them!
-        torch.cuda.empty_cache()
-
-        # set dataset
-        dataset = params[-3]
-
-        #load data
-        if self.verbose: print('Loading data...')
-        self._load_raw_data(dataset_name=dataset)
-        if self.verbose: print('Data loaded')
-
-        # download clean GAN
-        if download: self.download(dataset, itr=itr, epoch=self.EPOCHS-1)
-
-        # build clean gan
-        if not self.check_gan(dataset, itr=itr, epoch=self.EPOCHS-1):
-            if self.verbose: print('Building clean GAN...')
-            self._build_gan(dataset, itr=itr, save=True)
-            if self.verbose: print('Clean GAN built')
-        else:
-            if self.verbose: print('Clean GAN loaded')
-
-        # init GAN models
-        self._init_gan_models()
-        if self.verbose: print('Models initialized')
-
-        # download psnd GAN
-        if download: self.download(params, itr=itr, epoch=self.EPOCHS-1)
-
-        # check if the GAN was already created
-        if not self.check_gan(params, itr=itr, epoch=self.EPOCHS-1):
-            # make adv nb_samples
-            if self.verbose: print('Crafting adv samples...')
-            self._make_samples(params, itr=itr)
-            if self.verbose: print('Adv samples created')
-
-            # build adv gan
-            if self.verbose: print('Building PSND GAN...')
-            self._build_gan(params, itr=itr)
-            if self.verbose: print('PSND Gan built')
-        else:
-            if self.verbose: print('PSND GAN loaded')
-
-        # plot and visualize the results
-        self._plot_D(params, itr=itr)
-        self._visualize_samples(params, itr=itr)
-        if self.verbose: print('Plots and images generated')
-
-        # get fid score
-        if self.verbose: print('Calculating FID...')
-        fid = self._measure_FID(params, itr=itr)
-        if self.verbose: print('FID Calculated')
-
-        # log the experiment
-        logging.info(f'Experiment complete. Runtime: {(time.time()-start)//60}m.')
-
-        return fid
-
     def run_cln(self, dataset, itr=0, download=False):
         """Same as run above, except for clean GANs"""
         # check if the paramter is correct
@@ -647,13 +582,10 @@ class Experiment(abc.ABC):
 
         return fid
 
-    def detect(self, params, itr=0, download=False):
-        """Returns auc, fprs, tprs, thetas of detection and produces a ROC curve."""
-        if isinstance(params, str):
-            raise ValueError('PSND GAN missing.')
-
+    def run(self, params, itr=0, download=False):
+        """Returns a FID score. If PSND GAN already exists, it will simply re-do the FID"""
         # start experiment
-        logging.info(f'Starting detector: {self.GAN_NAME} {params} iteration {itr}.')
+        logging.info(f'Starting experiment: {self.GAN_NAME} {params} iteration {itr}.')
         start = time.time()
 
         # don't need vars stored in GPU memory anymore, release them!
@@ -662,14 +594,17 @@ class Experiment(abc.ABC):
         # set dataset
         dataset = params[-3]
 
+        #load data
+        if self.verbose: print('Loading data...')
+        self._load_raw_data(dataset_name=dataset)
+        if self.verbose: print('Data loaded')
+
         # download clean GAN
         if download: self.download(dataset, itr=itr, epoch=self.EPOCHS-1)
 
-        # build clean gan
+        # check clean gan
         if not self.check_gan(dataset, itr=itr, epoch=self.EPOCHS-1):
             raise ValueError('Clean GAN not found.')
-        else:
-            if self.verbose: print('Clean GAN loaded')
 
         # init GAN models
         self._init_gan_models()
@@ -680,11 +615,67 @@ class Experiment(abc.ABC):
 
         # check if the GAN was already created
         if not self.check_gan(params, itr=itr, epoch=self.EPOCHS-1):
-            raise ValueError('PSND GAN not found.')
+            # make adv nb_samples
+            if self.verbose: print('Crafting adv samples...')
+            self._make_samples(params, itr=itr)
+            if self.verbose: print('Adv samples created')
+
+            # build adv gan
+            if self.verbose: print('Building PSND GAN...')
+            self._build_gan(params, itr=itr)
+            if self.verbose: print('PSND Gan built')
         else:
             if self.verbose: print('PSND GAN loaded')
 
+        # plot and visualize the results
+        self._plot_D(params, itr=itr)
+        self._visualize_samples(params, itr=itr)
+        if self.verbose: print('Plots and images generated')
+
+        # get fid score
+        if self.verbose: print('Calculating FID...')
+        fid = self._measure_FID(params, itr=itr)
+        if self.verbose: print('FID Calculated')
+
+        # log the experiment
+        logging.info(f'Experiment complete. Runtime: {(time.time()-start)//60}m.')
+
+        return fid
+
+    def detect(self, params, itr=0, download=False):
+        """Returns auc, fprs, tprs, thetas of detection and produces a ROC curve."""
+        if isinstance(params, str):
+            raise ValueError('PSND GAN missing.')
+
+        # start experiment
+        logging.info(f'Starting detector: {self.GAN_NAME} {params} iteration {itr}.')
+        start = time.time()
+
         if self.verbose: print('Running detector...')
+
+        # don't need vars stored in GPU memory anymore, release them!
+        torch.cuda.empty_cache()
+
+        # set dataset
+        dataset = params[-3]
+
+        # download clean GAN
+        if download: self.download(dataset, itr=itr, epoch=self.EPOCHS-1)
+
+        # check clean gan
+        if not self.check_gan(dataset, itr=itr, epoch=self.EPOCHS-1):
+            raise ValueError('Clean GAN not found.')
+
+        # init GAN models
+        self._init_gan_models()
+        if self.verbose: print('Models initialized')
+
+        # download psnd GAN
+        if download: self.download(params, itr=itr, epoch=self.EPOCHS-1)
+
+        # check psnd GAN
+        if not self.check_gan(params, itr=itr, epoch=self.EPOCHS-1):
+            raise ValueError('PSND GAN not found.')
 
         # get data with adv samples
         X, y = [v.to(self.DEVICE) for v in self._load_adv_data(params, itr=itr)]
@@ -784,14 +775,14 @@ class Experiment(abc.ABC):
         # calculate AUC
         auc = np.trapz(*(sorted(v) for v in [tprs, fprs]))
 
-        # plot ROC curve
-        plt.plot(fprs, tprs, label=dataset+', auc='+str(round(auc,2)))
-        plt.xlabel('FPR')
-        plt.ylabel('TPR')
-        plt.legend()
-        name = self.RESULTS + 'ROC_'+OUTPUT_ID.format(c, pct, itr)+'.svg'
-        plt.savefig(name)
-        plt.close()
+        # # plot ROC curve
+        # plt.plot(fprs, tprs, label=dataset+', auc='+str(round(auc,2)))
+        # plt.xlabel('FPR')
+        # plt.ylabel('TPR')
+        # plt.legend()
+        # name = self.RESULTS + 'ROC_'+OUTPUT_ID.format(c, pct, itr)+'.svg'
+        # plt.savefig(name)
+        # plt.close()
 
         # log the experiment
         logging.info(f'Detection complete. AUC:{auc} Runtime: {(time.time()-start)//60}m.')

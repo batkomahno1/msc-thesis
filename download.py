@@ -1,12 +1,20 @@
 import subprocess
 from secrets import SERVER_NAME, REMOTE_LOCAL_PATHS, PROXY, DOWNLOADS_DIR, BKP_DIR
-import os, shutil, time
+import os, shutil, time, argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--quick", type=lambda v: v=='True', default=True, help="results file only")
+opt = parser.parse_args()
+print(opt)
+
+if opt.quick:
+    REMOTE_LOCAL_PATHS = REMOTE_LOCAL_PATHS[:2]
 
 REMOTE_ROOT_PATH = SERVER_NAME+':msc-thesis/'
 
 # delete old folder
 downloads_full_path = os.path.join(os.getcwd(), DOWNLOADS_DIR)
-if os.path.exists(downloads_full_path):
+if os.path.exists(downloads_full_path) and not opt.quick:
     print('Deleting', downloads_full_path)
     shutil.rmtree(downloads_full_path)
 
