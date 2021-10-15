@@ -7,3 +7,5 @@ tqdm
 scikit-learn
 mpmath
 tensorflow-gpu==1.15
+tensorflow-probability==0.13.0
+tensorflow-privacy
