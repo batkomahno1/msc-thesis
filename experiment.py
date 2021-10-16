@@ -96,7 +96,9 @@ class Experiment(abc.ABC):
         self.DIR = os.getcwd() + '/'
         OUTPUT = self.DIR + 'output/'
         self.DATA_DIR = OUTPUT + self.GAN_NAME + '/data/'
-        self.GAN_DIR = self.DIR + 'external/PyTorch-GAN/implementations/'+self.GAN_NAME+'/'
+        # TODO: this initialization is hacky
+        if 'GAN_DIR' not in self.__dict__:
+            self.GAN_DIR = self.DIR + 'external/PyTorch-GAN/implementations/'+self.GAN_NAME+'/'
         self.GAN_WEIGHTS_DIR = self.GAN_DIR + 'weights/'
         self.GAN_ARCHS_DIR = self.DIR + 'gan_archs/'
         self.TEST_MODELS_DIR = self.DIR + 'test_models/'
@@ -557,6 +559,10 @@ class Experiment(abc.ABC):
         self._load_raw_data(dataset_name=dataset)
         if self.verbose: print('Data loaded')
 
+        # init GAN models
+        self._init_gan_models()
+        if self.verbose: print('Models initialized')
+
         # download clean GAN
         if download: self.download(dataset, itr=itr, epoch=self.EPOCHS-1)
 
@@ -567,10 +573,6 @@ class Experiment(abc.ABC):
             if self.verbose: print('Clean GAN built')
         else:
             if self.verbose: print('Clean GAN loaded')
-
-        # init GAN models
-        self._init_gan_models()
-        if self.verbose: print('Models initialized')
 
         # get fid score
         if self.verbose: print('Calculating FID...')
@@ -599,16 +601,16 @@ class Experiment(abc.ABC):
         self._load_raw_data(dataset_name=dataset)
         if self.verbose: print('Data loaded')
 
+        # init GAN models
+        self._init_gan_models()
+        if self.verbose: print('Models initialized')
+
         # download clean GAN
         if download: self.download(dataset, itr=itr, epoch=self.EPOCHS-1)
 
         # check clean gan
         if not self.check_gan(dataset, itr=itr, epoch=self.EPOCHS-1):
             raise ValueError('Clean GAN not found.')
-
-        # init GAN models
-        self._init_gan_models()
-        if self.verbose: print('Models initialized')
 
         # download psnd GAN
         if download: self.download(params, itr=itr, epoch=self.EPOCHS-1)
@@ -775,14 +777,14 @@ class Experiment(abc.ABC):
         # calculate AUC
         auc = np.trapz(*(sorted(v) for v in [tprs, fprs]))
 
-        # # plot ROC curve
-        # plt.plot(fprs, tprs, label=dataset+', auc='+str(round(auc,2)))
-        # plt.xlabel('FPR')
-        # plt.ylabel('TPR')
-        # plt.legend()
-        # name = self.RESULTS + 'ROC_'+OUTPUT_ID.format(c, pct, itr)+'.svg'
-        # plt.savefig(name)
-        # plt.close()
+        # plot ROC curve
+        plt.plot(fprs, tprs, label=dataset+', auc='+str(round(auc,2)))
+        plt.xlabel('FPR')
+        plt.ylabel('TPR')
+        plt.legend()
+        name = self.RESULTS + 'ROC_'+OUTPUT_ID.format(c, pct, itr)+'.svg'
+        plt.savefig(name)
+        plt.close()
 
         # log the experiment
         logging.info(f'Detection complete. AUC:{auc} Runtime: {(time.time()-start)//60}m.')

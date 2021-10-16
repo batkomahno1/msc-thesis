@@ -44,7 +44,7 @@ class DPWGAN(object):
 
     def train(self, data, epochs=100, n_critics=5, batch_size=128,
               learning_rate=1e-4, sigma=None, weight_clip=0.1, meta_hook=None,
-              save_epochs=False, output_id=''):
+              save_epochs=False, output_id='', dir=''):
         """Train the model
 
         Parameters
@@ -77,12 +77,12 @@ class DPWGAN(object):
         # default meta-hook
         if meta_hook is None:
             meta_hook = lambda batch_size, sigma, paramter: \
-                            lambda grad: grad + (1 / batch_size) * sigma * torch.randn(parameter.shape)
+                            lambda grad: grad + (1 / batch_size) * sigma * torch.randn(parameter.shape).to(data.device)
 
         # add hooks to introduce noise to gradient for differential privacy
         if sigma is not None:
             for parameter in self.discriminator.parameters():
-                parameter.register_hook(meta_hook(batch_size, sigma, paramter))
+                parameter.register_hook(meta_hook(batch_size, sigma, parameter))
 
         # There is a batch for each critic (discriminator training iteration),
         # so each epoch is epoch_length iterations, and the total number of
@@ -93,8 +93,7 @@ class DPWGAN(object):
             for _ in range(n_critics):
                 # Sample real data
                 rand_perm = torch.randperm(data.size(0))
-                samples = data[rand_perm[:batch_size]]
-                real_sample = Variable(samples)
+                real_sample = data[rand_perm[:batch_size]]
 
                 # Sample fake data
                 fake_sample = self.generate(batch_size)
@@ -143,15 +142,15 @@ class DPWGAN(object):
             # NOTE: I added this
             if save_epochs and int(iteration % epoch_length) == 0:
                 os.makedirs("weights", exist_ok=True)
-                torch.save(get_dict(discriminator), './weights/d_'+output_id+'_epoch_'+str(epoch)+'.pth')
-                torch.save(get_dict(generator), './weights/g_'+output_id+'_epoch_'+str(epoch)+'.pth')
+                torch.save(get_dict(self.discriminator), dir+'weights/d_'+output_id+'_epoch_'+str(epoch)+'.pth')
+                torch.save(get_dict(self.generator), dir+'weights/g_'+output_id+'_epoch_'+str(epoch)+'.pth')
 
         os.makedirs("weights", exist_ok=True)
-        name_d = './weights/d_'+output_id+'_epoch_'+str(epoch)+'.pth'
-        name_g = './weights/g_'+output_id+'_epoch_'+str(epoch)+'.pth'
+        name_d = dir+'weights/d_'+output_id+'_epoch_'+str(epoch)+'.pth'
+        name_g = dir+'weights/g_'+output_id+'_epoch_'+str(epoch)+'.pth'
 
-        torch.save(get_dict(discriminator), name_d)
-        torch.save(get_dict(generator), name_g)
+        torch.save(get_dict(self.discriminator), name_d)
+        torch.save(get_dict(self.generator), name_g)
 
     def generate(self, n):
         """Generate a synthetic data set using the trained model

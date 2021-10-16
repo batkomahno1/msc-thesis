@@ -81,8 +81,9 @@ import torch.nn as nn
 import torch
 class Experiment_DPWGAN(Experiment):
     def __init__(self, **kwargs):
+        import os
+        self.GAN_DIR = os.getcwd() + '/' + 'external/dpwgan/dpwgan/'
         super().__init__('dpwgan', **kwargs)
-        self.GAN_DIR = self.DIR + 'external/dpwgan/'+self.GAN_NAME+'/'
 
     def _instantiate_G(self):
         return super()._instantiate_G()
@@ -91,6 +92,9 @@ class Experiment_DPWGAN(Experiment):
         return super()._instantiate_D()
 
     def _build_gan(self, p, itr=0, save=False):
+        import time
+        import numpy as np
+        from experiment import _import_model, get_hyper_param, OUTPUT_ID
         # TODO: use subprocess.check_output instead
         # , sigma=None, weight_clip=0.1, meta_hook=None
         start = time.time()
@@ -98,24 +102,32 @@ class Experiment_DPWGAN(Experiment):
 
         # check if this is a cln build and copy samples
         if isinstance(p, str):
-            X, y = [v.detach().clone() for v in [self.data, self.targets]]
+            X, y = [v.detach().clone().to(self.DEVICE) for v in [self.data, self.targets]]
         else:
-            X, y = self._load_adv_data(p,itr=itr)
+            X, y =[v.to(self.DEVICE) for v in self._load_adv_data(p,itr=itr)]
 
         # prepare noise generator for gan training
         noise_func = lambda n: self.FloatTensor(np.random.normal(0, 1, (n, self.LATENT_DIM)))
 
+        G, D = self._instantiate_G().to(self.DEVICE), self._instantiate_D().to(self.DEVICE)
+
+        if torch.cuda.device_count() > 1:
+            G, D = [nn.DataParallel(model) for model in [G, D]]
+
         # get the DP gan trainer
-        from experiment import _import_model
         var = _import_model(self.GAN_NAME.upper(), self.GAN_DIR+self.GAN_NAME+'.py')
-        gan_trainer = var(self.G, self.D, noise_func)
+        gan_trainer = var(G, D, noise_func)
 
         # build gan
         # sigma = None => non-private GAN
         # TODO: FIND SIGMA AND CLIP VAL!!
         gan_trainer.train(X, epochs = self.EPOCHS, n_critics = 5,
                             batch_size=self.BATCH_SIZE, learning_rate=0.00005,
-                            sigma=1, weight_clip=0.01, meta_hook=meta_hook,
-                            save_epochs=save, output_id=OUTPUT_ID.format(c,pct,itr))
+                            sigma=0.5, weight_clip=0.04, meta_hook=None,
+                            save_epochs=save, output_id=OUTPUT_ID.format(c,pct,itr), dir=self.GAN_DIR)
 
-        logging.info(f'Processed gan:{c} pct {pct} itr {itr} time {(time.time()-start)//60}m')
+        # logging.info(f'Processed gan:{c} pct {pct} itr {itr} time {(time.time()-start)//60}m')
+
+exp = Experiment_DPWGAN()
+exp._init_gan_models()
+exp._instantiate_G().parameters()

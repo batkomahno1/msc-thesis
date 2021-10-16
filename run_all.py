@@ -18,7 +18,7 @@ import logging
 from collections import Counter
 import shutil
 
-from experiments import Experiment_WGAN, Experiment_WGAN_GP, Experiment_CGAN, Experiment_ACGAN
+from experiments import Experiment_DPWGAN, Experiment_WGAN, Experiment_WGAN_GP, Experiment_CGAN, Experiment_ACGAN
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--nb_iter", type=int, default=1, help="number of iterations per experiment")
@@ -56,8 +56,9 @@ if opt.nb_gpus > 0 and torch.cuda.is_available():
     print('CUDA_VISIBLE_DEVICES: ',os.environ["CUDA_VISIBLE_DEVICES"])
 
 # Initialize architectures
-var = [Experiment_WGAN, Experiment_WGAN_GP, Experiment_CGAN, Experiment_ACGAN]
-val = ['wgan', 'wgan_gp', 'cgan', 'acgan']
+# TODO: put this somewhere in a config file
+var = [Experiment_DPWGAN, Experiment_WGAN, Experiment_WGAN_GP, Experiment_CGAN, Experiment_ACGAN]
+val = ['dpwgan', 'wgan', 'wgan_gp', 'cgan', 'acgan']
 GAN_CHOICES = {name:var[i] for i,name in enumerate(val)}
 
 ITERATIONS = opt.nb_iter
@@ -73,7 +74,7 @@ else:
 
 logging.info(f'Settings: {GAN_SETTINGS}')
 
-ARCH_FAMILIES = {'WASSERSTEIN':('wgan', 'wgan_gp'), 'CONDITIONAL':('cgan', 'acgan')}
+ARCH_FAMILIES = {'WASSERSTEIN':('dpwgan', 'wgan', 'wgan_gp'), 'CONDITIONAL':('cgan', 'acgan')}
 PARAM_SET = {}
 RUN_NAME = 'run_'+'_'.join(time.asctime().split(' ')[1:3]).lower()+'_'+time.asctime().split(' ')[-1]
 RES_DIR =  os.getcwd() + '/experiment_results/'
