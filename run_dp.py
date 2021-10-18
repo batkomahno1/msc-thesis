@@ -58,28 +58,27 @@ if opt.nb_gpus > 0 and torch.cuda.is_available():
 # Initialize architectures
 # TODO: put this somewhere in a config file
 var = [Experiment_DPWGAN, Experiment_WGAN, Experiment_WGAN_GP, Experiment_CGAN, Experiment_ACGAN]
-val = ['wgan', 'wgan_gp', 'cgan', 'acgan']
+val = ['dpwgan', 'wgan', 'wgan_gp', 'cgan', 'acgan']
 GAN_CHOICES = {name:var[i] for i,name in enumerate(val)}
 
 ITERATIONS = opt.nb_iter
 if not opt.test:
-    from config import *
+    from config_dp import *
     EXPERIMENTS = [GAN_CHOICES[name](epochs = GAN_SETTINGS[name][0], batch_size=GAN_SETTINGS[name][1], \
                     verbose=opt.verbose, device=device) for name in GAN_CHOICE]
 else:
     opt.verbose=True
-    from config_test import *
+    from config_test_dp import *
     EXPERIMENTS = [GAN_CHOICES[name](epochs = GAN_SETTINGS[name][0], batch_size=GAN_SETTINGS[name][1], \
                     verbose=opt.verbose, device=device) for name in GAN_CHOICE]
 
 logging.info(f'Settings: {GAN_SETTINGS}')
 
-ARCH_FAMILIES = {'WASSERSTEIN':('wgan', 'wgan_gp'), 'CONDITIONAL':('cgan', 'acgan')}
+ARCH_FAMILIES = {'WASSERSTEIN':('dpwgan', 'wgan', 'wgan_gp'), 'CONDITIONAL':('cgan', 'acgan')}
 PARAM_SET = {}
 RUN_NAME = 'run_'+'_'.join(time.asctime().split(' ')[1:3]).lower()+'_'+time.asctime().split(' ')[-1]
 RES_DIR =  os.getcwd() + '/experiment_results/'
-RUN_PATH = RES_DIR + RUN_NAME + '.pkl'
-RUN_PATH_CURR = RES_DIR + 'results.pkl'
+RUN_PATH_CURR = RES_DIR + 'results_dp.pkl'
 
 # delete all old data
 if opt.reset:
@@ -102,8 +101,6 @@ def get_params(*args):
     return list(itertools.product(*args))
 
 def save_res(obj):
-    with open(RUN_PATH, 'wb') as f:
-        pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
     with open(RUN_PATH_CURR, 'wb') as f:
         pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
 
@@ -141,23 +138,40 @@ if os.path.isfile(RUN_PATH_CURR):
         iter_start = max(iter_list) + 1
         if opt.verbose: print('Resuming at iteration', iter_start)
 
+
+import copy
 # run the exp
 result = dict()
 for itr in range(iter_start, iter_start + ITERATIONS):
     for exp in EXPERIMENTS:
         gan_name = exp.GAN_NAME
-
-        # calculate clean FID here
-        for dataset in DATASET:
-            if (gan_name, dataset, itr) not in result.keys():
-                if opt.verbose: print('Calculating clean FID')
-                start = time.time()
-                fid_cln = exp.run_cln(dataset, itr=itr, download=opt.download)
-                result[(gan_name, dataset, itr)] = fid_cln, time.time()-start
-        arch_family = [k for k,v in ARCH_FAMILIES.items() if gan_name in v][0]
-
         # calculate psnd FID here
+        arch_family = [k for k,v in ARCH_FAMILIES.items() if gan_name in v][0]
+        print(PARAM_SET[arch_family])
         for params in PARAM_SET[arch_family]:
+            # check if low prob run was performed previously
+            atk=params[-2]
+            if 'norm' in atk.lower():
+                params_low_prob_rv = list(copy.deepcopy(params))
+                params_low_prob_rv[-2] = 'low'
+                assert exp.check_gan(tuple(params_low_prob_rv), itr=itr)
+                exp.meta_hook = None
+
+            # fix the RV to hide the attack
+            if 'low' in atk.lower():
+                # add DP RV 1.5 SDs from mean => prob ~ 20%
+                exp.meta_hook = lambda batch_size, sigma, paramter: \
+                                lambda grad: grad + 1.5 * sigma / batch_size
+
+            # always calculate clean GAN for dataset
+            # mean prob weights will overwrite low prob ones
+            if opt.verbose: print('Calculating clean FID')
+            start = time.time()
+            dataset = params[-3]
+            fid_cln = exp.run_cln(dataset, itr=itr, download=False)
+            result[(gan_name, dataset, itr)] = fid_cln, time.time()-start
+
+            # calculate psnd GAN
             if exp.check_gan(params, itr=itr) and not opt.test and not opt.soft_reset:
                 raise RuntimeError('Overwriting an epxeriment!')
             eps, note = params[3], params[-1]
@@ -166,9 +180,18 @@ for itr in range(iter_start, iter_start + ITERATIONS):
                 continue
             if opt.verbose: print(gan_name, params, itr)
             start = time.time()
-            fid = exp.run(params, itr=itr, download=opt.download)
-            detections = exp.detect(params, itr=itr, download=opt.download)
+            fid = exp.run(params, itr=itr, download=False)
+            detections = exp.detect(params, itr=itr, download=False)
             result[(gan_name, params, itr)] = fid, detections, time.time()-start
+
+            # run detector with norm prob generator and low prob samples
+            # this uses the fact that low prob generator was overwritten
+            # low prob result index will contain the mixed run detection
+            if 'norm' in atk.lower():
+                start = time.time()
+                detections = exp.detect(params_low_prob_rv, itr=itr, download=False)
+                result[(gan_name, params, itr)] = fid, detections, time.time()-start
+
     # save at the end of an iteration
     save_res(result)
     logging.info(f'Iteration {itr} complete at {time.asctime()}')

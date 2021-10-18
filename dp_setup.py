@@ -60,19 +60,36 @@ import torch
 
 # https://math.stackexchange.com/a/2894689
 meta_hook = lambda batch_size, sigma, shape: (1 / batch_size) * sigma * torch.randn(shape).cpu().detach()
-plt.plot(meta_hook(64, 0.5, 1000))
-plt.show()
 
-sigma = 0.4
-eps = 0.04*2*m/M*sqrt(5*log(1/1e-6))/sigma
-eps
-# Plot between -10 and 10 with .001 steps.
-x_axis = np.arange(-cp*10, cp*10, 0.001)
-# Mean = 0, SD = 2.
-plt.plot(x_axis, norm.pdf(x_axis,0,(sigma/m)))
 x_axis = np.arange(-5, 5, 0.001)
 plt.plot(x_axis, norm.pdf(x_axis,0,1))
 plt.show()
 weights = torch.load('output/dpwgan/data/data_param_mnist_pct_0_iter_0.pt')
 # weights = torch.load('tmp/data_param_mnist_pct_0_iter_0.pt')
 plt.hist(weights.flatten().cpu().numpy(), 5)
+
+sigma = 0.5
+eps = 0.04*2*m/M*sqrt(5*log(1/1e-6))/sigma
+eps
+# Plot between -10 and 10 with .001 steps.
+x_axis = np.arange(-cp*10, cp*10, 0.001)
+mean = 0
+sd = sigma/m
+plt.plot(x_axis, norm.pdf(x_axis,mean,sd))
+norm.pdf(sd,0,sd)
+
+
+sigma = 0.4#0.4234#0.4
+eps = 0.04*2*m/M*sqrt(5*log(1/1e-6))/sigma
+eps
+# Plot between -10 and 10 with .001 steps.
+# x_axis = np.arange(-cp*10, cp*10, 0.001)
+x_axis = np.linspace(-cp*10,cp*10, 1000)
+mean = 0
+sd = sigma/m
+norm.pdf(1.5*sd,0,sd)
+
+plt.plot(x_axis, norm.pdf(x_axis,mean,sd))
+plt.axvline(x=sd)
+plt.show()
+sd

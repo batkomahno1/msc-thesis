@@ -1,9 +1,9 @@
 DATASET=('mnist',)
-TGT_EPOCHS=(0,)
+TGT_EPOCHS=(1,)
 PCT=(20,)
-EPS=(0, 1.0,) # try zero here
+EPS=(1.0,) # try zero here
 TARGETED=(True,)
-ATK = ('inf',)
+ATK = ('low','norm')
 NOTE=('earlyStop',)
 
 # # select GANs to be tested
@@ -19,10 +19,11 @@ NOTE=('earlyStop',)
 # }
 
 # check if FIDs are same as during prototyping
-GAN_CHOICE = ['wgan']
+GAN_CHOICE = ['dpwgan']
 GAN_SETTINGS = {
 'acgan':(50,1000),
 'cgan':(100,500),
 'wgan_gp':(50,250),
 'wgan':(100,500//8),
+'dpwgan':(2,500//8),
 }

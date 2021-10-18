@@ -567,7 +567,8 @@ class Experiment(abc.ABC):
         if download: self.download(dataset, itr=itr, epoch=self.EPOCHS-1)
 
         # build clean gan
-        if not self.check_gan(dataset, itr=itr, epoch=self.EPOCHS-1):
+        # TODO: FIX THIS SUCH THAT IT ONLY RETRAINS GANS FOR DP!!
+        if not self.check_gan(dataset, itr=itr, epoch=self.EPOCHS-1) or True:
             if self.verbose: print('Building clean GAN...')
             self._build_gan(dataset, itr=itr, save=True)
             if self.verbose: print('Clean GAN built')

@@ -84,6 +84,9 @@ class Experiment_DPWGAN(Experiment):
         import os
         self.GAN_DIR = os.getcwd() + '/' + 'external/dpwgan/dpwgan/'
         super().__init__('dpwgan', **kwargs)
+        self.sigma=0.4
+        self.weight_clip=0.04
+        self.meta_hook=None
 
     def _instantiate_G(self):
         return super()._instantiate_G()
@@ -120,14 +123,9 @@ class Experiment_DPWGAN(Experiment):
 
         # build gan
         # sigma = None => non-private GAN
-        # TODO: FIND SIGMA AND CLIP VAL!!
         gan_trainer.train(X, epochs = self.EPOCHS, n_critics = 5,
                             batch_size=self.BATCH_SIZE, learning_rate=0.00005,
-                            sigma=0.5, weight_clip=0.04, meta_hook=None,
+                            sigma=self.sigma, weight_clip=self.weight_clip, meta_hook=self.meta_hook,
                             save_epochs=save, output_id=OUTPUT_ID.format(c,pct,itr), dir=self.GAN_DIR)
 
         # logging.info(f'Processed gan:{c} pct {pct} itr {itr} time {(time.time()-start)//60}m')
-
-exp = Experiment_DPWGAN()
-exp._init_gan_models()
-exp._instantiate_G().parameters()
