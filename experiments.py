@@ -116,7 +116,8 @@ class Experiment_DPWGAN(Experiment):
         G, D = self._instantiate_G().to(self.DEVICE), self._instantiate_D().to(self.DEVICE)
 
         if torch.cuda.device_count() > 1:
-            G, D = [nn.DataParallel(model) for model in [G, D]]
+            devices = range(len(os.environ["CUDA_VISIBLE_DEVICES"].split(',')))
+            G, D = [nn.DataParallel(model, device_ids=devices) for model in [G, D]]
 
         # get the DP gan trainer
         var = _import_model(self.GAN_NAME.upper(), self.GAN_DIR+self.GAN_NAME+'.py')

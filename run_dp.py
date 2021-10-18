@@ -147,7 +147,6 @@ for itr in range(iter_start, iter_start + ITERATIONS):
         gan_name = exp.GAN_NAME
         # calculate psnd FID here
         arch_family = [k for k,v in ARCH_FAMILIES.items() if gan_name in v][0]
-        print(PARAM_SET[arch_family])
         for params in PARAM_SET[arch_family]:
             # check if low prob run was performed previously
             atk=params[-2]
