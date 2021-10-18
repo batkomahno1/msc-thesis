@@ -148,6 +148,7 @@ for itr in range(iter_start, iter_start + ITERATIONS):
         # calculate psnd FID here
         arch_family = [k for k,v in ARCH_FAMILIES.items() if gan_name in v][0]
         for params in PARAM_SET[arch_family]:
+            if opt.verbose: print(gan_name, params, itr)
             # check if low prob run was performed previously
             atk=params[-2]
             if 'norm' in atk.lower():
@@ -171,13 +172,12 @@ for itr in range(iter_start, iter_start + ITERATIONS):
             result[(gan_name, dataset, itr)] = fid_cln, time.time()-start
 
             # calculate psnd GAN
-            if exp.check_gan(params, itr=itr) and not opt.test and not opt.soft_reset:
-                raise RuntimeError('Overwriting an epxeriment!')
+            # if exp.check_gan(params, itr=itr) and not opt.test and not opt.soft_reset:
+            #     raise RuntimeError('Overwriting an epxeriment!')
             eps, note = params[3], params[-1]
             if 'downgrade'==note.lower() and eps==0.0:
                 logging.info(f'Experiment {params} skipped!.')
                 continue
-            if opt.verbose: print(gan_name, params, itr)
             start = time.time()
             fid = exp.run(params, itr=itr, download=False)
             detections = exp.detect(params, itr=itr, download=False)
