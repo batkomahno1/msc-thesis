@@ -31,7 +31,7 @@ sigma
 
 ###########CHECK IMAGES AT EACH EPOCH###########
 p = ['mnist', 0, 20, 1.0, True, 'inf', 'earlyStop']
-from config_test import *
+from config_test_dp import *
 from experiments import Experiment_DPWGAN
 name='dpwgan'
 dataset = 'mnist'
@@ -76,8 +76,23 @@ x_axis = np.arange(-cp*10, cp*10, 0.001)
 mean = 0
 sd = sigma/m
 plt.plot(x_axis, norm.pdf(x_axis,mean,sd))
-norm.pdf(sd,0,sd)
+norm.pdf(0,0,sd)
+norm.pdf(0,0,sd)**100
 
+sd
+prob=norm.cdf(sd,0,sd)-norm.cdf(-sd,0,sd)
+prob
+prob**1
+
+from scipy.stats import bernoulli
+bernoulli.pmf(5, prob)
+
+import scipy
+
+# scipy.stats.binom.sf(60, 100, prob)
+# https://stats.stackexchange.com/questions/394036/if-i-make-n-trials-each-independent-with-p-chance-of-success-what-is-the-proba
+tot_prob = scipy.stats.binom.cdf(100, 100, prob)-scipy.stats.binom.cdf(70, 100, prob)
+tot_prob
 
 sigma = 0.4#0.4234#0.4
 eps = 0.04*2*m/M*sqrt(5*log(1/1e-6))/sigma
@@ -93,3 +108,9 @@ plt.plot(x_axis, norm.pdf(x_axis,mean,sd))
 plt.axvline(x=sd)
 plt.show()
 sd
+
+import torch
+t = torch.rand((2,2))
+t
+t+1
+t + scipy.stats.truncnorm.rvs(-sigma/m, sigma/m, loc=0, scale=sigma/m)

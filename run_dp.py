@@ -17,6 +17,7 @@ import argparse
 import logging
 from collections import Counter
 import shutil
+from scipy.stats import truncnorm
 
 from experiments import Experiment_DPWGAN, Experiment_WGAN, Experiment_WGAN_GP, Experiment_CGAN, Experiment_ACGAN
 
@@ -159,10 +160,10 @@ for itr in range(iter_start, iter_start + ITERATIONS):
 
             # fix the RV to hide the attack
             if 'low' in atk.lower():
-                # add DP RV 1.5 SDs from mean => prob ~ 20%
+                # add fixed DP RV
+                # 70% of samples fall within +/- one sd of norm => ~30%
                 exp.meta_hook = lambda batch_size, sigma, paramter: \
-                                lambda grad: grad + 1.5 * sigma / batch_size
-
+                                lambda grad: grad + truncnorm.rvs(-sigma/batch_size, sigma/batch_size, loc=0, scale=sigma/batch_size)
             # always calculate clean GAN for dataset
             # mean prob weights will overwrite low prob ones
             if opt.verbose: print('Calculating clean FID')
