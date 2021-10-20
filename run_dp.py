@@ -185,7 +185,8 @@ for exp in EXPERIMENTS:
                 if 'norm' in atk.lower():
                     start = time.time()
                     detections = exp.detect(params_low_prob_rv, itr=itr, download=False)
-                    result[(gan_name, params, itr)] = fid, detections, time.time()-start
+                    prev_cln_fid = result[(gan_name, params_low_prob_rv, itr)][0]
+                    result[(gan_name, params_low_prob_rv, itr)] = prev_cln_fid, detections, time.time()-start
 
         # save at the end of an iteration
         save_res(result)
