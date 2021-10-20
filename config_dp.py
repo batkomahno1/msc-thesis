@@ -12,7 +12,7 @@ GAN_CHOICE = ['dpwgan']
 
 # gan name : epochs, batch size
 GAN_SETTINGS = {
-'dpwgan':(100,500),
+'dpwgan':(100,128),
 }
 
 10*4*5//60
