@@ -184,6 +184,7 @@ for exp in EXPERIMENTS:
                 # low prob result index will contain the mixed run detection
                 if 'norm' in atk.lower():
                     start = time.time()
+                    params_low_prob_rv = tuple(params_low_prob_rv)
                     detections = exp.detect(params_low_prob_rv, itr=itr, download=False)
                     prev_cln_fid = result[(gan_name, params_low_prob_rv, itr)][0]
                     result[(gan_name, params_low_prob_rv, itr)] = prev_cln_fid, detections, time.time()-start
