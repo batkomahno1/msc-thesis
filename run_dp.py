@@ -143,55 +143,50 @@ if os.path.isfile(RUN_PATH_CURR):
 import copy
 # run the exp
 result = dict()
-for itr in range(iter_start, iter_start + ITERATIONS):
-    for exp in EXPERIMENTS:
-        gan_name = exp.GAN_NAME
-        # calculate psnd FID here
-        arch_family = [k for k,v in ARCH_FAMILIES.items() if gan_name in v][0]
-        for params in PARAM_SET[arch_family]:
-            if opt.verbose: print(gan_name, params, itr)
-            # check if low prob run was performed previously
-            atk=params[-2]
-            if 'norm' in atk.lower():
-                params_low_prob_rv = list(copy.deepcopy(params))
-                params_low_prob_rv[-2] = 'low'
-                assert exp.check_gan(tuple(params_low_prob_rv), itr=itr)
-                exp.meta_hook = None
+for exp in EXPERIMENTS:
+    gan_name = exp.GAN_NAME
+    arch_family = [k for k,v in ARCH_FAMILIES.items() if gan_name in v][0]
+    params = PARAM_SET[arch_family]
+    for itr in range(iter_start, iter_start + ITERATIONS):
+        for dataset in DATASET:
+            for atk in ['low', 'norm']:
+                params=get_params((-1,), TGT_EPOCHS, PCT, EPS, TARGETED, (dataset,), (atk,), NOTE)[0]
+                if opt.verbose: print(gan_name, params, itr)
+                # check if low prob run was performed previously
+                if 'norm' in atk.lower():
+                    params_low_prob_rv = list(copy.deepcopy(params))
+                    params_low_prob_rv[-2] = 'low'
+                    assert exp.check_gan(tuple(params_low_prob_rv), itr=itr)
+                    exp.meta_hook = None
 
-            # fix the RV to hide the attack
-            if 'low' in atk.lower():
-                # add fixed DP RV
-                # 70% of samples fall within +/- one sd of norm => ~30%
-                exp.meta_hook = lambda batch_size, sigma, paramter: \
-                                lambda grad: grad + truncnorm.rvs(-sigma/batch_size, sigma/batch_size, loc=0, scale=sigma/batch_size)
-            # always calculate clean GAN for dataset
-            # mean prob weights will overwrite low prob ones
-            if opt.verbose: print('Calculating clean FID')
-            start = time.time()
-            dataset = params[-3]
-            fid_cln = exp.run_cln(dataset, itr=itr, download=False)
-            result[(gan_name, dataset, itr)] = fid_cln, time.time()-start
+                # fix the RV to hide the attack
+                if 'low' in atk.lower():
+                    # add fixed DP RV
+                    # 70% of samples fall within +/- one sd of norm => ~30%
+                    exp.meta_hook = lambda batch_size, sigma, paramter: \
+                                    lambda grad: grad + truncnorm.rvs(-sigma/batch_size, sigma/batch_size, loc=0, scale=sigma/batch_size)
 
-            # calculate psnd GAN
-            # if exp.check_gan(params, itr=itr) and not opt.test and not opt.soft_reset:
-            #     raise RuntimeError('Overwriting an epxeriment!')
-            eps, note = params[3], params[-1]
-            if 'downgrade'==note.lower() and eps==0.0:
-                logging.info(f'Experiment {params} skipped!.')
-                continue
-            start = time.time()
-            fid = exp.run(params, itr=itr, download=False)
-            detections = exp.detect(params, itr=itr, download=False)
-            result[(gan_name, params, itr)] = fid, detections, time.time()-start
-
-            # run detector with norm prob generator and low prob samples
-            # this uses the fact that low prob generator was overwritten
-            # low prob result index will contain the mixed run detection
-            if 'norm' in atk.lower():
+                # always calculate clean GAN for dataset
+                # mean prob weights will overwrite low prob ones
+                if opt.verbose: print('Calculating clean FID')
                 start = time.time()
-                detections = exp.detect(params_low_prob_rv, itr=itr, download=False)
+                fid_cln = exp.run_cln(dataset, itr=itr, download=False)
+                result[(gan_name, dataset, itr)] = fid_cln, time.time()-start
+
+                # calculate psnd GAN
+                start = time.time()
+                fid = exp.run(params, itr=itr, download=False)
+                detections = exp.detect(params, itr=itr, download=False)
                 result[(gan_name, params, itr)] = fid, detections, time.time()-start
 
-    # save at the end of an iteration
-    save_res(result)
-    logging.info(f'Iteration {itr} complete at {time.asctime()}')
+                # run detector with norm prob generator and low prob samples
+                # this uses the fact that low prob generator was overwritten
+                # low prob result index will contain the mixed run detection
+                if 'norm' in atk.lower():
+                    start = time.time()
+                    detections = exp.detect(params_low_prob_rv, itr=itr, download=False)
+                    result[(gan_name, params, itr)] = fid, detections, time.time()-start
+
+        # save at the end of an iteration
+        save_res(result)
+        logging.info(f'Iteration {itr} complete at {time.asctime()}')
