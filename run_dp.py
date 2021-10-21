@@ -18,7 +18,7 @@ import logging
 from collections import Counter
 import shutil
 from scipy.stats import truncnorm
-
+import copy
 from experiments import Experiment_DPWGAN, Experiment_WGAN, Experiment_WGAN_GP, Experiment_CGAN, Experiment_ACGAN
 
 parser = argparse.ArgumentParser()
@@ -129,20 +129,19 @@ def all_equal(iterable):
 iter_start = 0
 if os.path.isfile(RUN_PATH_CURR):
     with open(RUN_PATH_CURR, 'rb') as f:
-        var = pickle.load(f)
+        result = pickle.load(f)
         # list of iterations ie. [0,0,0,1,1,1,...] from result.pkl
-        iter_list = [k[-1] for k in var.keys()]
+        iter_list = [k[-1] for k in result.keys()]
         # experiments per iteration
         iter_count = Counter(iter_list)
         if not all_equal(iter_count.values()):
             raise RuntimeError('Inconsistent num. of iterations per experiment!', iter_count)
         iter_start = max(iter_list) + 1
         if opt.verbose: print('Resuming at iteration', iter_start)
+else:
+    result = dict()
 
-
-import copy
 # run the exp
-result = dict()
 for exp in EXPERIMENTS:
     gan_name = exp.GAN_NAME
     arch_family = [k for k,v in ARCH_FAMILIES.items() if gan_name in v][0]

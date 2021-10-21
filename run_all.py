@@ -18,7 +18,7 @@ import logging
 from collections import Counter
 import shutil
 
-from experiments import Experiment_DPWGAN, Experiment_WGAN, Experiment_WGAN_GP, Experiment_CGAN, Experiment_ACGAN
+from experiments import Experiment_WGAN, Experiment_WGAN_GP, Experiment_CGAN, Experiment_ACGAN
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--nb_iter", type=int, default=1, help="number of iterations per experiment")
@@ -57,7 +57,7 @@ if opt.nb_gpus > 0 and torch.cuda.is_available():
 
 # Initialize architectures
 # TODO: put this somewhere in a config file
-var = [Experiment_DPWGAN, Experiment_WGAN, Experiment_WGAN_GP, Experiment_CGAN, Experiment_ACGAN]
+var = [Experiment_WGAN, Experiment_WGAN_GP, Experiment_CGAN, Experiment_ACGAN]
 val = ['wgan', 'wgan_gp', 'cgan', 'acgan']
 GAN_CHOICES = {name:var[i] for i,name in enumerate(val)}
 
@@ -131,18 +131,19 @@ def all_equal(iterable):
 iter_start = 0
 if os.path.isfile(RUN_PATH_CURR):
     with open(RUN_PATH_CURR, 'rb') as f:
-        var = pickle.load(f)
+        result = pickle.load(f)
         # list of iterations ie. [0,0,0,1,1,1,...] from result.pkl
-        iter_list = [k[-1] for k in var.keys()]
+        iter_list = [k[-1] for k in result.keys()]
         # experiments per iteration
         iter_count = Counter(iter_list)
         if not all_equal(iter_count.values()):
             raise RuntimeError('Inconsistent num. of iterations per experiment!', iter_count)
         iter_start = max(iter_list) + 1
         if opt.verbose: print('Resuming at iteration', iter_start)
+else:
+    result = dict()
 
 # run the exp
-result = dict()
 for itr in range(iter_start, iter_start + ITERATIONS):
     for exp in EXPERIMENTS:
         gan_name = exp.GAN_NAME

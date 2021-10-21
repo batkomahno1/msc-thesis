@@ -137,5 +137,6 @@ from math import *
 import statistics as stats
 [stats.mean(v) for v in [low_auc_mnist, norm_auc_mnist]]
 a,b = [stats.mean(v) for v in [low_auc_fmnist, norm_auc_fmnist]]
-
+a,b
+[1 for v in low_auc_fmnist if v > max(norm_auc_fmnist)]
 plt.boxplot([low_auc_fmnist, norm_auc_fmnist])
