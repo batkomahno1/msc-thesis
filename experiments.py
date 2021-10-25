@@ -2,6 +2,10 @@ import os
 from experiment import Experiment
 import torch.nn as nn
 import torch
+import logging
+import time
+import numpy as np
+from experiment import Experiment, _import_model, get_hyper_param, OUTPUT_ID
 
 class Experiment_ACGAN(Experiment):
     def __init__(self, **kwargs):
@@ -77,16 +81,13 @@ class Experiment_WGAN_GP(Experiment):
     def _instantiate_D(self):
         return super()._instantiate_D()
 
-from experiment import Experiment
-import torch.nn as nn
-import torch
 class Experiment_DPWGAN(Experiment):
     def __init__(self, **kwargs):
         import os
         self.GAN_DIR = os.getcwd() + '/' + 'external/dpwgan/dpwgan/'
         super().__init__('dpwgan', **kwargs)
-        self.sigma=0.4
-        self.weight_clip=0.04
+        self.sigma=451#880#124308#0.4
+        self.weight_clip=0.001#0.002
         self.meta_hook=None
 
     def _instantiate_G(self):
@@ -96,9 +97,7 @@ class Experiment_DPWGAN(Experiment):
         return super()._instantiate_D()
 
     def _build_gan(self, p, itr=0, save=False):
-        import time
-        import numpy as np
-        from experiment import _import_model, get_hyper_param, OUTPUT_ID
+        logging.info(f'Starting experiment: DPWGAN {p} iteration {itr}.')
         # TODO: use subprocess.check_output instead
         # , sigma=None, weight_clip=0.1, meta_hook=None
         start = time.time()
@@ -130,4 +129,4 @@ class Experiment_DPWGAN(Experiment):
                             sigma=self.sigma, weight_clip=self.weight_clip, meta_hook=self.meta_hook,
                             save_epochs=save, output_id=OUTPUT_ID.format(c,pct,itr), dir=self.GAN_DIR)
 
-        # logging.info(f'Processed gan:{c} pct {pct} itr {itr} time {(time.time()-start)//60}m')
+        logging.info(f'Processed gan:{c} pct {pct} itr {itr} time {(time.time()-start)//60}m')

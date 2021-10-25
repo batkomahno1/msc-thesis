@@ -530,7 +530,8 @@ class Experiment(abc.ABC):
         from secrets import SERVER_NAME
         if epoch is None: epoch = self.EPOCHS-1
         c,pct=get_hyper_param(params)
-        server_path = self.gan_g_path.format(c,pct,itr,epoch).replace(self.DIR, SERVER_NAME+':msc-thesis/')
+        root_dir = ':dp/msc-thesis/' if self.GAN_NAME == 'dpwgan' else ':msc-thesis/'
+        server_path = self.gan_g_path.format(c,pct,itr,epoch).replace(self.DIR, SERVER_NAME+root_dir)
         local_path = self.gan_g_path.format(c,pct,itr,epoch)
         if self.verbose:
             print('server_path:'+server_path)
@@ -567,8 +568,7 @@ class Experiment(abc.ABC):
         if download: self.download(dataset, itr=itr, epoch=self.EPOCHS-1)
 
         # build clean gan
-        # TODO: FIX THIS SUCH THAT IT ONLY RETRAINS GANS FOR DP!!
-        if not self.check_gan(dataset, itr=itr, epoch=self.EPOCHS-1) or True:
+        if not self.check_gan(dataset, itr=itr, epoch=self.EPOCHS-1):
             if self.verbose: print('Building clean GAN...')
             self._build_gan(dataset, itr=itr, save=True)
             if self.verbose: print('Clean GAN built')
@@ -645,10 +645,13 @@ class Experiment(abc.ABC):
 
         return fid
 
-    def detect(self, params, itr=0, download=False):
+    def detect(self, params, itr=0, download=False, itr_other=None):
         """Returns auc, fprs, tprs, thetas of detection and produces a ROC curve."""
         if isinstance(params, str):
             raise ValueError('PSND GAN missing.')
+
+        # check if running detection within the same iteration
+        itr_other = itr if itr_other is None else itr_other
 
         # start experiment
         logging.info(f'Starting detector: {self.GAN_NAME} {params} iteration {itr}.')

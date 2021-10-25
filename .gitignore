@@ -159,3 +159,4 @@ backup
 backup_dp
 profile.txt
 external/dpwgan/dpwgan/weights
+dp_setup.py

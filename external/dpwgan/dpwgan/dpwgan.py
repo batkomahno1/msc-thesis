@@ -1,5 +1,5 @@
 import logging
-
+import warnings
 import torch
 import torch.optim as optim
 import torch.utils.data
@@ -19,6 +19,7 @@ else:
 Tensor = lambda *args: torch.FloatTensor(*args).to(device) if cuda else torch.FloatTensor(*args)
 
 get_dict = lambda v: v.state_dict() if len(os.environ["CUDA_VISIBLE_DEVICES"])<2 else v.module.state_dict()
+get_model = lambda v: v.model if len(os.environ["CUDA_VISIBLE_DEVICES"])<2 else v.module.model
 
 class DPWGAN(object):
     """Class to store, train, and generate from a
@@ -115,11 +116,20 @@ class DPWGAN(object):
 
                 # Weight clipping for privacy guarantee
                 for param in self.discriminator.parameters():
+                    # print([v.flatten().mean().item() for v in self.discriminator.parameters()])
                     param.data.clamp_(-weight_clip, weight_clip)
 
                 # Reset gradient
                 self.generator.zero_grad()
                 self.discriminator.zero_grad()
+
+                # check that B_sigma holds and log any violations!
+                with torch.no_grad():
+                    img_flat = lambda img: img.view(img.shape[0], -1)
+                    # use slightly higher float for comparison to avoid arithmetic errors
+                    if not all(get_model(self.discriminator)[:2](img_flat(real_sample)).flatten() < 1.01):
+                        logging.info('POSSIBLE DP VIOLATION! Discriminator activation unbounded(B_Sigma).')
+                        warnings.warn('POSSIBLE DP VIOLATION! Discriminator activation unbounded(B_Sigma).')
 
             # Sample and score fake data
             fake_sample = self.generate(batch_size)

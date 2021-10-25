@@ -141,53 +141,44 @@ if os.path.isfile(RUN_PATH_CURR):
 else:
     result = dict()
 
-# run the exp
-for exp in EXPERIMENTS:
-    gan_name = exp.GAN_NAME
-    arch_family = [k for k,v in ARCH_FAMILIES.items() if gan_name in v][0]
-    params = PARAM_SET[arch_family]
-    for itr in range(iter_start, iter_start + ITERATIONS):
-        for dataset in DATASET:
-            for atk in ['low', 'norm']:
-                params=get_params((-1,), TGT_EPOCHS, PCT, EPS, TARGETED, (dataset,), (atk,), NOTE)[0]
-                if opt.verbose: print(gan_name, params, itr)
-                # check if low prob run was performed previously
-                if 'norm' in atk.lower():
-                    params_low_prob_rv = list(copy.deepcopy(params))
-                    params_low_prob_rv[-2] = 'low'
-                    assert exp.check_gan(tuple(params_low_prob_rv), itr=itr)
-                    exp.meta_hook = None
+# build GANs first then run detections
+for itr in range(iter_start, iter_start + ITERATIONS):
+    for exp in EXPERIMENTS:
+        start = time.time()
 
-                # fix the RV to hide the attack
-                if 'low' in atk.lower():
-                    # add fixed DP RV
-                    # 70% of samples fall within +/- one sd of norm => ~30%
-                    exp.meta_hook = lambda batch_size, sigma, paramter: \
-                                    lambda grad: grad + truncnorm.rvs(-sigma/batch_size, sigma/batch_size, loc=0, scale=sigma/batch_size)
+        # retrieve params
+        gan_name = exp.GAN_NAME
+        arch_family = [k for k,v in ARCH_FAMILIES.items() if gan_name in v][0]
+        for params in PARAM_SET[arch_family]:
+            logging.info(f'RUNNING EXP {gan_name} WITH {params} AT {itr}')
+            if opt.verbose: print(gan_name, params, itr)
 
-                # always calculate clean GAN for dataset
-                # mean prob weights will overwrite low prob ones
-                if opt.verbose: print('Calculating clean FID')
-                start = time.time()
-                fid_cln = exp.run_cln(dataset, itr=itr, download=False)
-                result[(gan_name, dataset, itr)] = fid_cln, time.time()-start
+            # dataset name is the parameter for a clean GAN
+            dataset = params[-3]
 
-                # calculate psnd GAN
-                start = time.time()
-                fid = exp.run(params, itr=itr, download=False)
-                detections = exp.detect(params, itr=itr, download=False)
-                result[(gan_name, params, itr)] = fid, detections, time.time()-start
+            # make clean gan
+            fid_cln = exp.run_cln(dataset, itr=itr, download=opt.download)
 
-                # run detector with norm prob generator and low prob samples
-                # this uses the fact that low prob generator was overwritten
-                # low prob result index will contain the mixed run detection
-                if 'norm' in atk.lower():
-                    start = time.time()
-                    params_low_prob_rv = tuple(params_low_prob_rv)
-                    detections = exp.detect(params_low_prob_rv, itr=itr, download=False)
-                    prev_cln_fid = result[(gan_name, params_low_prob_rv, itr)][0]
-                    result[(gan_name, params_low_prob_rv, itr)] = prev_cln_fid, detections, time.time()-start
+            # make samples
+            exp._make_samples(params, itr=itr)
 
-        # save at the end of an iteration
-        save_res(result)
-        logging.info(f'Iteration {itr} complete at {time.asctime()}')
+            # run detections
+            detections = None
+            # skip first iteration for lack of a second gan
+            if itr > 0:
+                itr_other = np.random.choice([i for i in range(itr) if i!=itr], 1, replace=False)[0]
+                detections = exp.detect(params, itr=itr, download=opt.download, itr_other=itr_other)
+
+                # catch up with the first iteration
+                if itr == 1:
+                    itr_other = itr
+                    detections_prev = exp.detect(params, itr=0, download=opt.download, itr_other=itr_other)
+                    result[(gan_name, dataset, 0)][1] = detections_prev
+
+            # save the result
+            result[(gan_name, dataset, itr)] = [fid_cln, detections, time.time()-start]
+            logging.info(f'DONE.')
+
+    # save at the end of an iteration
+    save_res(result)
+    logging.info(f'Iteration {itr} complete at {time.asctime()}')

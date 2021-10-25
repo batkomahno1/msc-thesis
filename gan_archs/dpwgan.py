@@ -38,11 +38,12 @@ class Discriminator(nn.Module):
         self.IMG_SHAPE = img_shape
 
         self.model = nn.Sequential(
-            nn.Linear(int(np.prod(self.IMG_SHAPE)), 512),
+            # https://stackoverflow.com/questions/32514502/neural-networks-what-does-the-input-layer-consist-of
+            nn.Linear(int(np.prod(self.IMG_SHAPE)), 512), # hidden layer 1
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(512, 256),
+            nn.Linear(512, 256), # hidden layer 2
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(256, 1),
+            nn.Linear(256, 1), # output layer
         )
 
     def forward(self, img):

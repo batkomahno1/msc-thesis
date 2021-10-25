@@ -1,10 +1,10 @@
 # FOR DP CAN ONLY CHANGE PCT SIZE OR NUMBER OF DATASETS
-DATASET=('mnist','fmnist',)
+DATASET=('mnist', 'fmnist',)
 TGT_EPOCHS=(1,)
-PCT=(20,)
+PCT=(10, 20,)
 EPS=(1.0,)
 TARGETED=(True,)
-ATK = ('low','norm')
+ATK = ('norm',)
 NOTE=('earlyStop',)
 
 # select GAN archs to experiment
@@ -12,7 +12,5 @@ GAN_CHOICE = ['dpwgan']
 
 # gan name : epochs, batch size
 GAN_SETTINGS = {
-'dpwgan':(100,128),
+'dpwgan':(100,64*4),
 }
-
-10*4*5//60
