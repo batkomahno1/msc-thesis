@@ -86,8 +86,8 @@ class Experiment_DPWGAN(Experiment):
         import os
         self.GAN_DIR = os.getcwd() + '/' + 'external/dpwgan/dpwgan/'
         super().__init__('dpwgan', **kwargs)
-        self.sigma=451#880#124308#0.4
-        self.weight_clip=0.001#0.002
+        self.sigma=0.047 #None
+        self.weight_clip=0.1 #None
         self.meta_hook=None
 
     def _instantiate_G(self):
@@ -95,6 +95,14 @@ class Experiment_DPWGAN(Experiment):
 
     def _instantiate_D(self):
         return super()._instantiate_D()
+
+    def _load_raw_data(self, **kwargs):
+        """Leave only classes zero and one. Easier to synthesize for DP WGAN!"""
+        super()._load_raw_data(kwargs)
+        self.classes = [0,1]
+        idxs = torch.cat([torch.where(self.targets == tgt)[0].flatten() for tgt in self.classes])
+        self.targets = self.targets[idxs]
+        self.data = self.data[idxs]
 
     def _build_gan(self, p, itr=0, save=False):
         logging.info(f'Starting experiment: DPWGAN {p} iteration {itr}.')

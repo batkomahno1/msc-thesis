@@ -3,7 +3,7 @@ TGT_EPOCHS=(1,)
 PCT=(20,)
 EPS=(1.0,) # try zero here
 TARGETED=(True,)
-ATK = ('low','norm')
+ATK = ('norm',)
 NOTE=('earlyStop',)
 
 # # select GANs to be tested
@@ -25,5 +25,7 @@ GAN_SETTINGS = {
 'cgan':(100,500),
 'wgan_gp':(50,250),
 'wgan':(100,500//8),
-'dpwgan':(100,64),
+'dpwgan':(50,64//4),
 }
+
+1*5*4

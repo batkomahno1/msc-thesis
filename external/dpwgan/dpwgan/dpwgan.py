@@ -68,6 +68,8 @@ class DPWGAN(object):
             Returns a hook function that adds noise to gradients (for DP).
             This is used to control the RV for simulations!
         """
+        epoch=0
+
         generator_solver = optim.RMSprop(
             self.generator.parameters(), lr=learning_rate
         )
@@ -78,7 +80,11 @@ class DPWGAN(object):
         # default meta-hook
         if meta_hook is None:
             meta_hook = lambda batch_size, sigma, paramter: \
-                            lambda grad: grad + (1 / batch_size) * sigma * torch.randn(parameter.shape).to(data.device)
+                            lambda grad: grad + (1 / batch_size**1) * sigma * torch.randn(parameter.shape).to(data.device)
+                            # lambda grad: torch.clamp(grad, -cg, cg) + (1 / batch_size**2) * sigma * torch.randn(parameter.shape).to(data.device)
+
+        if weight_clip is None:
+            weight_clip = 0.1
 
         # add hooks to introduce noise to gradient for differential privacy
         if sigma is not None:
@@ -91,7 +97,7 @@ class DPWGAN(object):
         epoch_length = len(data) / (n_critics * batch_size)
         n_iters = int(epochs * epoch_length)
         for iteration in range(n_iters):
-            for _ in range(n_critics):
+            for itr_critic in range(n_critics):
                 # Sample real data
                 rand_perm = torch.randperm(data.size(0))
                 real_sample = data[rand_perm[:batch_size]]
@@ -116,20 +122,11 @@ class DPWGAN(object):
 
                 # Weight clipping for privacy guarantee
                 for param in self.discriminator.parameters():
-                    # print([v.flatten().mean().item() for v in self.discriminator.parameters()])
                     param.data.clamp_(-weight_clip, weight_clip)
 
                 # Reset gradient
                 self.generator.zero_grad()
                 self.discriminator.zero_grad()
-
-                # check that B_sigma holds and log any violations!
-                with torch.no_grad():
-                    img_flat = lambda img: img.view(img.shape[0], -1)
-                    # use slightly higher float for comparison to avoid arithmetic errors
-                    if not all(get_model(self.discriminator)[:2](img_flat(real_sample)).flatten() < 1.01):
-                        logging.info('POSSIBLE DP VIOLATION! Discriminator activation unbounded(B_Sigma).')
-                        warnings.warn('POSSIBLE DP VIOLATION! Discriminator activation unbounded(B_Sigma).')
 
             # Sample and score fake data
             fake_sample = self.generate(batch_size)
@@ -148,12 +145,12 @@ class DPWGAN(object):
 
             if int(iteration % epoch_length) == 0:
                 epoch = int(iteration / epoch_length)
-
-            # NOTE: I added this
-            if save_epochs and int(iteration % epoch_length) == 0:
-                os.makedirs("weights", exist_ok=True)
-                torch.save(get_dict(self.discriminator), dir+'weights/d_'+output_id+'_epoch_'+str(epoch)+'.pth')
-                torch.save(get_dict(self.generator), dir+'weights/g_'+output_id+'_epoch_'+str(epoch)+'.pth')
+                print('\rEpoch:\t', epoch, end='')
+                # NOTE: I added this
+                if save_epochs:
+                    os.makedirs("weights", exist_ok=True)
+                    torch.save(get_dict(self.discriminator), dir+'weights/d_'+output_id+'_epoch_'+str(epoch)+'.pth')
+                    torch.save(get_dict(self.generator), dir+'weights/g_'+output_id+'_epoch_'+str(epoch)+'.pth')
 
         os.makedirs("weights", exist_ok=True)
         name_d = dir+'weights/d_'+output_id+'_epoch_'+str(epoch)+'.pth'
@@ -161,6 +158,8 @@ class DPWGAN(object):
 
         torch.save(get_dict(self.discriminator), name_d)
         torch.save(get_dict(self.generator), name_g)
+
+        print('DPWGAN done.')
 
     def generate(self, n):
         """Generate a synthetic data set using the trained model

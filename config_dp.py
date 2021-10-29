@@ -1,7 +1,7 @@
 # FOR DP CAN ONLY CHANGE PCT SIZE OR NUMBER OF DATASETS
-DATASET=('mnist', 'fmnist',)
+DATASET=('mnist',)
 TGT_EPOCHS=(1,)
-PCT=(10, 20,)
+PCT=(20,)
 EPS=(1.0,)
 TARGETED=(True,)
 ATK = ('norm',)
@@ -12,5 +12,5 @@ GAN_CHOICE = ['dpwgan']
 
 # gan name : epochs, batch size
 GAN_SETTINGS = {
-'dpwgan':(100,64*4),
+'dpwgan':(50,64//4),
 }
