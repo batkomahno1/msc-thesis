@@ -17,6 +17,7 @@ import argparse
 import logging
 from collections import Counter
 import shutil
+import numpy as np
 from scipy.stats import truncnorm
 import copy
 from experiments import Experiment_DPWGAN, Experiment_WGAN, Experiment_WGAN_GP, Experiment_CGAN, Experiment_ACGAN

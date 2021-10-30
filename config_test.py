@@ -21,8 +21,8 @@ NOTE=('earlyStop',)
 # check if FIDs are same as during prototyping
 GAN_CHOICE = ['wgan']
 GAN_SETTINGS = {
-'acgan':(1,1000),
-'cgan':(1,500),
-'wgan_gp':(1,250),
-'wgan':(1,500//8),
+'acgan':(50,1000),
+'cgan':(100,500),
+'wgan_gp':(50,250),
+'wgan':(100,500//8),
 }

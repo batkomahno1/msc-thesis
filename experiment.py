@@ -541,50 +541,6 @@ class Experiment(abc.ABC):
         proc = subprocess.run(["scp", server_path, local_path])
         proc.check_returncode()
 
-    def run_cln(self, dataset, itr=0, download=False):
-        """Same as run above, except for clean GANs"""
-        # check if the paramter is correct
-        if not isinstance(dataset, str):
-            raise ValueError('Input must be datset and iteration.')
-
-        # start experiment
-        logging.info(f'Starting experiment: {self.GAN_NAME} {dataset} iteration {itr}.')
-        start = time.time()
-
-        # TODO: CHECK THIS
-        # don't need vars stored in GPU memory anymore, release them!
-        torch.cuda.empty_cache()
-
-        #load data
-        if self.verbose: print('Loading data...')
-        self._load_raw_data(dataset_name=dataset)
-        if self.verbose: print('Data loaded')
-
-        # init GAN models
-        self._init_gan_models()
-        if self.verbose: print('Models initialized')
-
-        # download clean GAN
-        if download: self.download(dataset, itr=itr, epoch=self.EPOCHS-1)
-
-        # build clean gan
-        if not self.check_gan(dataset, itr=itr, epoch=self.EPOCHS-1):
-            if self.verbose: print('Building clean GAN...')
-            self._build_gan(dataset, itr=itr, save=True)
-            if self.verbose: print('Clean GAN built')
-        else:
-            if self.verbose: print('Clean GAN loaded')
-
-        # get fid score
-        if self.verbose: print('Calculating FID...')
-        fid = self._measure_FID(dataset, itr=itr)
-        if self.verbose: print('FID Calculated')
-
-        # log the experiment
-        logging.info(f'Experiment complete. Runtime: {(time.time()-start)//60}m.')
-
-        return fid
-
     def run(self, params, itr=0, download=False):
         """Returns a FID score. If PSND GAN already exists, it will simply re-do the FID"""
         # start experiment
@@ -638,6 +594,50 @@ class Experiment(abc.ABC):
         # get fid score
         if self.verbose: print('Calculating FID...')
         fid = self._measure_FID(params, itr=itr)
+        if self.verbose: print('FID Calculated')
+
+        # log the experiment
+        logging.info(f'Experiment complete. Runtime: {(time.time()-start)//60}m.')
+
+        return fid
+
+    def run_cln(self, dataset, itr=0, download=False):
+        """Same as run above, except for clean GANs"""
+        # check if the paramter is correct
+        if not isinstance(dataset, str):
+            raise ValueError('Input must be datset and iteration.')
+
+        # start experiment
+        logging.info(f'Starting experiment: {self.GAN_NAME} {dataset} iteration {itr}.')
+        start = time.time()
+
+        # TODO: CHECK THIS
+        # don't need vars stored in GPU memory anymore, release them!
+        torch.cuda.empty_cache()
+
+        #load data
+        if self.verbose: print('Loading data...')
+        self._load_raw_data(dataset_name=dataset)
+        if self.verbose: print('Data loaded')
+
+        # init GAN models
+        self._init_gan_models()
+        if self.verbose: print('Models initialized')
+
+        # download clean GAN
+        if download: self.download(dataset, itr=itr, epoch=self.EPOCHS-1)
+
+        # build clean gan
+        if not self.check_gan(dataset, itr=itr, epoch=self.EPOCHS-1):
+            if self.verbose: print('Building clean GAN...')
+            self._build_gan(dataset, itr=itr, save=True)
+            if self.verbose: print('Clean GAN built')
+        else:
+            if self.verbose: print('Clean GAN loaded')
+
+        # get fid score
+        if self.verbose: print('Calculating FID...')
+        fid = self._measure_FID(dataset, itr=itr)
         if self.verbose: print('FID Calculated')
 
         # log the experiment
