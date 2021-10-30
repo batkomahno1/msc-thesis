@@ -679,9 +679,10 @@ class Experiment(abc.ABC):
         # download psnd GAN
         if download: self.download(params, itr=itr, epoch=self.EPOCHS-1)
 
-        # check psnd GAN
-        if not self.check_gan(params, itr=itr, epoch=self.EPOCHS-1):
-            raise ValueError('PSND GAN not found.')
+        # TODO: CHECK FOR ADV SAMPLES INSTEAD!!
+        # # check psnd GAN
+        # if not self.check_gan(params, itr=itr, epoch=self.EPOCHS-1):
+        #     raise ValueError('PSND GAN not found.')
 
         # get data with adv samples
         X, y = [v.to(self.DEVICE) for v in self._load_adv_data(params, itr=itr)]

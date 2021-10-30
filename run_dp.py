@@ -154,6 +154,9 @@ for itr in range(iter_start, iter_start + ITERATIONS):
             logging.info(f'RUNNING EXP {gan_name} WITH {params} AT {itr}')
             if opt.verbose: print(gan_name, params, itr)
 
+            # toggle DP sanitization
+            exp.sigma, exp.weight_clip = 0.047, 0.1
+
             # dataset name is the parameter for a clean GAN
             dataset = params[-3]
 

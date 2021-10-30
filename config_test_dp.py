@@ -1,9 +1,9 @@
-DATASET=('mnist',)
+DATASET=('mnist','fmnist',)
 TGT_EPOCHS=(1,)
 PCT=(20,)
 EPS=(1.0,) # try zero here
 TARGETED=(True,)
-ATK = ('norm',)
+ATK = ('dp',)
 NOTE=('earlyStop',)
 
 # # select GANs to be tested

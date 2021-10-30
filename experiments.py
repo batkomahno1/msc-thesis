@@ -82,13 +82,13 @@ class Experiment_WGAN_GP(Experiment):
         return super()._instantiate_D()
 
 class Experiment_DPWGAN(Experiment):
+    """By default this GAN is non-private!"""
     def __init__(self, **kwargs):
-        import os
         self.GAN_DIR = os.getcwd() + '/' + 'external/dpwgan/dpwgan/'
         super().__init__('dpwgan', **kwargs)
-        self.sigma=0.047 #None
-        self.weight_clip=0.1 #None
-        self.meta_hook=None
+        self.sigma = None
+        self.weight_clip = None
+        self.meta_hook = None
 
     def _instantiate_G(self):
         return super()._instantiate_G()
