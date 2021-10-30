@@ -1,6 +1,6 @@
 import os
 # # THIS MUST HAPPEN BEFORE TORCH IS IMPORTED!!!
-assert os.environ["CUDA_DEVICE_ORDER"]=="PCI_BUS_ID"
+# assert os.environ["CUDA_DEVICE_ORDER"]=="PCI_BUS_ID"
 import torch
 import torch.optim as optim
 import numpy as np

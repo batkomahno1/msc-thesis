@@ -142,6 +142,7 @@ external/PyTorch-GAN/implementations/wgan_gp/weights
 external/PyTorch-GAN/implementations/wgan_gp/images
 
 downloads
+downloads_dp
 download.sh
 upload.sh
 
@@ -155,4 +156,7 @@ secrets.py
 reports
 output
 backup
+backup_dp
 profile.txt
+external/dpwgan/dpwgan/weights
+dp_setup.py

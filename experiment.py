@@ -1,5 +1,5 @@
 import os
-assert os.environ["CUDA_DEVICE_ORDER"]=="PCI_BUS_ID"
+# assert os.environ["CUDA_DEVICE_ORDER"]=="PCI_BUS_ID"
 import torch
 import torch.nn as nn
 
@@ -31,7 +31,7 @@ defense_gan = importlib.import_module("external.DefenseGAN-Pytorch.util_defense_
 OUTPUT_ID = 'param_{}_pct_{}_iter_{}'
 HYPERPARAM = 'tgt_{}_epoch_{}_eps_{}_tgted_{}_set_{}_atk_{}_note_{}'
 
-IMPLEMENTED_ARCHS = ['cgan','acgan','wgan','wgan_gp']
+IMPLEMENTED_ARCHS = ['cgan','acgan','wgan','wgan_gp', 'dpwgan']
 CONDITIONAL_ARCHS = ['cgan', 'acgan']
 
 # THIS IS APPROX 20% OF A SINGLE CLASS
@@ -96,7 +96,9 @@ class Experiment(abc.ABC):
         self.DIR = os.getcwd() + '/'
         OUTPUT = self.DIR + 'output/'
         self.DATA_DIR = OUTPUT + self.GAN_NAME + '/data/'
-        self.GAN_DIR = self.DIR + 'external/PyTorch-GAN/implementations/'+self.GAN_NAME+'/'
+        # TODO: this initialization is hacky
+        if 'GAN_DIR' not in self.__dict__:
+            self.GAN_DIR = self.DIR + 'external/PyTorch-GAN/implementations/'+self.GAN_NAME+'/'
         self.GAN_WEIGHTS_DIR = self.GAN_DIR + 'weights/'
         self.GAN_ARCHS_DIR = self.DIR + 'gan_archs/'
         self.TEST_MODELS_DIR = self.DIR + 'test_models/'
@@ -528,7 +530,8 @@ class Experiment(abc.ABC):
         from secrets import SERVER_NAME
         if epoch is None: epoch = self.EPOCHS-1
         c,pct=get_hyper_param(params)
-        server_path = self.gan_g_path.format(c,pct,itr,epoch).replace(self.DIR, SERVER_NAME+':msc-thesis/')
+        root_dir = ':dp/msc-thesis/' if self.GAN_NAME == 'dpwgan' else ':msc-thesis/'
+        server_path = self.gan_g_path.format(c,pct,itr,epoch).replace(self.DIR, SERVER_NAME+root_dir)
         local_path = self.gan_g_path.format(c,pct,itr,epoch)
         if self.verbose:
             print('server_path:'+server_path)
@@ -544,7 +547,6 @@ class Experiment(abc.ABC):
         logging.info(f'Starting experiment: {self.GAN_NAME} {params} iteration {itr}.')
         start = time.time()
 
-        # TODO: CHECK THIS
         # don't need vars stored in GPU memory anymore, release them!
         torch.cuda.empty_cache()
 
@@ -556,20 +558,16 @@ class Experiment(abc.ABC):
         self._load_raw_data(dataset_name=dataset)
         if self.verbose: print('Data loaded')
 
-        # download clean GAN
-        if download: self.download(dataset, itr=itr, epoch=self.EPOCHS-1)
-
-        # build clean gan
-        if not self.check_gan(dataset, itr=itr, epoch=self.EPOCHS-1):
-            if self.verbose: print('Building clean GAN...')
-            self._build_gan(dataset, itr=itr, save=True)
-            if self.verbose: print('Clean GAN built')
-        else:
-            if self.verbose: print('Clean GAN loaded')
-
         # init GAN models
         self._init_gan_models()
         if self.verbose: print('Models initialized')
+
+        # download clean GAN
+        if download: self.download(dataset, itr=itr, epoch=self.EPOCHS-1)
+
+        # check clean gan
+        if not self.check_gan(dataset, itr=itr, epoch=self.EPOCHS-1):
+            raise ValueError('Clean GAN not found.')
 
         # download psnd GAN
         if download: self.download(params, itr=itr, epoch=self.EPOCHS-1)
@@ -622,6 +620,10 @@ class Experiment(abc.ABC):
         self._load_raw_data(dataset_name=dataset)
         if self.verbose: print('Data loaded')
 
+        # init GAN models
+        self._init_gan_models()
+        if self.verbose: print('Models initialized')
+
         # download clean GAN
         if download: self.download(dataset, itr=itr, epoch=self.EPOCHS-1)
 
@@ -633,10 +635,6 @@ class Experiment(abc.ABC):
         else:
             if self.verbose: print('Clean GAN loaded')
 
-        # init GAN models
-        self._init_gan_models()
-        if self.verbose: print('Models initialized')
-
         # get fid score
         if self.verbose: print('Calculating FID...')
         fid = self._measure_FID(dataset, itr=itr)
@@ -647,14 +645,19 @@ class Experiment(abc.ABC):
 
         return fid
 
-    def detect(self, params, itr=0, download=False):
+    def detect(self, params, itr=0, download=False, itr_other=None):
         """Returns auc, fprs, tprs, thetas of detection and produces a ROC curve."""
         if isinstance(params, str):
             raise ValueError('PSND GAN missing.')
 
+        # check if running detection within the same iteration
+        itr_other = itr if itr_other is None else itr_other
+
         # start experiment
         logging.info(f'Starting detector: {self.GAN_NAME} {params} iteration {itr}.')
         start = time.time()
+
+        if self.verbose: print('Running detector...')
 
         # don't need vars stored in GPU memory anymore, release them!
         torch.cuda.empty_cache()
@@ -665,11 +668,9 @@ class Experiment(abc.ABC):
         # download clean GAN
         if download: self.download(dataset, itr=itr, epoch=self.EPOCHS-1)
 
-        # build clean gan
+        # check clean gan
         if not self.check_gan(dataset, itr=itr, epoch=self.EPOCHS-1):
             raise ValueError('Clean GAN not found.')
-        else:
-            if self.verbose: print('Clean GAN loaded')
 
         # init GAN models
         self._init_gan_models()
@@ -678,13 +679,9 @@ class Experiment(abc.ABC):
         # download psnd GAN
         if download: self.download(params, itr=itr, epoch=self.EPOCHS-1)
 
-        # check if the GAN was already created
+        # check psnd GAN
         if not self.check_gan(params, itr=itr, epoch=self.EPOCHS-1):
             raise ValueError('PSND GAN not found.')
-        else:
-            if self.verbose: print('PSND GAN loaded')
-
-        if self.verbose: print('Running detector...')
 
         # get data with adv samples
         X, y = [v.to(self.DEVICE) for v in self._load_adv_data(params, itr=itr)]

@@ -17,8 +17,10 @@ import argparse
 import logging
 from collections import Counter
 import shutil
-
-from experiments import Experiment_WGAN, Experiment_WGAN_GP, Experiment_CGAN, Experiment_ACGAN
+import numpy as np
+from scipy.stats import truncnorm
+import copy
+from experiments import Experiment_DPWGAN, Experiment_WGAN, Experiment_WGAN_GP, Experiment_CGAN, Experiment_ACGAN
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--nb_iter", type=int, default=1, help="number of iterations per experiment")
@@ -57,29 +59,28 @@ if opt.nb_gpus > 0 and torch.cuda.is_available():
 
 # Initialize architectures
 # TODO: put this somewhere in a config file
-var = [Experiment_WGAN, Experiment_WGAN_GP, Experiment_CGAN, Experiment_ACGAN]
-val = ['wgan', 'wgan_gp', 'cgan', 'acgan']
+var = [Experiment_DPWGAN, Experiment_WGAN, Experiment_WGAN_GP, Experiment_CGAN, Experiment_ACGAN]
+val = ['dpwgan', 'wgan', 'wgan_gp', 'cgan', 'acgan']
 GAN_CHOICES = {name:var[i] for i,name in enumerate(val)}
 
 ITERATIONS = opt.nb_iter
 if not opt.test:
-    from config import *
+    from config_dp import *
     EXPERIMENTS = [GAN_CHOICES[name](epochs = GAN_SETTINGS[name][0], batch_size=GAN_SETTINGS[name][1], \
                     verbose=opt.verbose, device=device) for name in GAN_CHOICE]
 else:
     opt.verbose=True
-    from config_test import *
+    from config_test_dp import *
     EXPERIMENTS = [GAN_CHOICES[name](epochs = GAN_SETTINGS[name][0], batch_size=GAN_SETTINGS[name][1], \
                     verbose=opt.verbose, device=device) for name in GAN_CHOICE]
 
 logging.info(f'Settings: {GAN_SETTINGS}')
 
-ARCH_FAMILIES = {'WASSERSTEIN':('wgan', 'wgan_gp'), 'CONDITIONAL':('cgan', 'acgan')}
+ARCH_FAMILIES = {'WASSERSTEIN':('dpwgan', 'wgan', 'wgan_gp'), 'CONDITIONAL':('cgan', 'acgan')}
 PARAM_SET = {}
 RUN_NAME = 'run_'+'_'.join(time.asctime().split(' ')[1:3]).lower()+'_'+time.asctime().split(' ')[-1]
 RES_DIR =  os.getcwd() + '/experiment_results/'
-RUN_PATH = RES_DIR + RUN_NAME + '.pkl'
-RUN_PATH_CURR = RES_DIR + 'results.pkl'
+RUN_PATH_CURR = RES_DIR + 'results_dp.pkl'
 
 # delete all old data
 if opt.reset:
@@ -102,8 +103,6 @@ def get_params(*args):
     return list(itertools.product(*args))
 
 def save_res(obj):
-    with open(RUN_PATH, 'wb') as f:
-        pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
     with open(RUN_PATH_CURR, 'wb') as f:
         pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
 
@@ -143,33 +142,44 @@ if os.path.isfile(RUN_PATH_CURR):
 else:
     result = dict()
 
-# run the exp
+# build GANs first then run detections
 for itr in range(iter_start, iter_start + ITERATIONS):
     for exp in EXPERIMENTS:
+        start = time.time()
+
+        # retrieve params
         gan_name = exp.GAN_NAME
-
-        # calculate clean FID here
-        for dataset in DATASET:
-            if (gan_name, dataset, itr) not in result.keys():
-                if opt.verbose: print('Calculating clean FID')
-                start = time.time()
-                fid_cln = exp.run_cln(dataset, itr=itr, download=opt.download)
-                result[(gan_name, dataset, itr)] = fid_cln, time.time()-start
         arch_family = [k for k,v in ARCH_FAMILIES.items() if gan_name in v][0]
-
-        # calculate psnd FID here
         for params in PARAM_SET[arch_family]:
-            if exp.check_gan(params, itr=itr) and not opt.test and not opt.soft_reset:
-                raise RuntimeError('Overwriting an epxeriment!')
-            eps, note = params[3], params[-1]
-            if 'downgrade'==note.lower() and eps==0.0:
-                logging.info(f'Experiment {params} skipped!.')
-                continue
+            logging.info(f'RUNNING EXP {gan_name} WITH {params} AT {itr}')
             if opt.verbose: print(gan_name, params, itr)
-            start = time.time()
-            fid = exp.run(params, itr=itr, download=opt.download)
-            detections = exp.detect(params, itr=itr, download=opt.download)
-            result[(gan_name, params, itr)] = fid, detections, time.time()-start
+
+            # dataset name is the parameter for a clean GAN
+            dataset = params[-3]
+
+            # make clean gan
+            fid_cln = exp.run_cln(dataset, itr=itr, download=opt.download)
+
+            # make samples
+            exp._make_samples(params, itr=itr)
+
+            # run detections
+            detections = None
+            # skip first iteration for lack of a second gan
+            if itr > 0:
+                itr_other = np.random.choice([i for i in range(itr) if i!=itr], 1, replace=False)[0]
+                detections = exp.detect(params, itr=itr, download=opt.download, itr_other=itr_other)
+
+                # catch up with the first iteration
+                if itr == 1:
+                    itr_other = itr
+                    detections_prev = exp.detect(params, itr=0, download=opt.download, itr_other=itr_other)
+                    result[(gan_name, dataset, 0)][1] = detections_prev
+
+            # save the result
+            result[(gan_name, dataset, itr)] = [fid_cln, detections, time.time()-start]
+            logging.info(f'DONE.')
+
     # save at the end of an iteration
     save_res(result)
     logging.info(f'Iteration {itr} complete at {time.asctime()}')

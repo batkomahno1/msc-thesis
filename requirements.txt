@@ -5,5 +5,3 @@ Pillow
 pytorch-fid
 tqdm
 scikit-learn
-mpmath
-tensorflow-gpu==1.15

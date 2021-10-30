@@ -41,6 +41,11 @@ python3 detect.py --help
 
 ```
 
+## Run experiments
+```
+python3 run_dp.py --help
+```
+
 ## Notes
 ```
 GAN weights are not saved in the output folder!
