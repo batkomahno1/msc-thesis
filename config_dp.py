@@ -5,7 +5,7 @@ TGT_EPOCHS=(1,)
 PCT=(20,)
 EPS=(1.0,)
 TARGETED=(True,)
-ATK = ('dp',)
+ATK = ('dp','nondp',)
 NOTE=('earlyStop',)
 
 # select GAN archs to experiment

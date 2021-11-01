@@ -628,7 +628,8 @@ class Experiment(abc.ABC):
         if download: self.download(dataset, itr=itr, epoch=self.EPOCHS-1)
 
         # build clean gan
-        if not self.check_gan(dataset, itr=itr, epoch=self.EPOCHS-1):
+        # always overwrite clean gan in dp experiments
+        if not self.check_gan(dataset, itr=itr, epoch=self.EPOCHS-1) or self.GAN_NAME=='dpwgan':
             if self.verbose: print('Building clean GAN...')
             self._build_gan(dataset, itr=itr, save=True)
             if self.verbose: print('Clean GAN built')

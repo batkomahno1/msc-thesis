@@ -154,16 +154,22 @@ for itr in range(iter_start, iter_start + ITERATIONS):
             logging.info(f'RUNNING EXP {gan_name} WITH {params} AT {itr}')
             if opt.verbose: print(gan_name, params, itr)
 
-            # TODO: move this somewhere
             # toggle DP sanitization
-            exp.sigma, exp.weight_clip = 0.047, 0.1
+            if params[-2] == 'dp'
+                exp.sigma, exp.weight_clip = 0.047, 0.1
+            else:
+                exp.sigma, exp.weight_clip = None, None
 
             # dataset name is the parameter for a clean GAN
             dataset = params[-3]
 
             # make clean gan
             fid_cln = exp.run_cln(dataset, itr=itr, download=opt.download)
-            result[(gan_name, dataset, itr)] = [fid_cln, time.time()-start]
+
+            # add the clean result bearing in mind that nonprivate gan might overwrite the private one or vice versa
+            var = copy.deepcopy(params)
+            var[3] = 0.0
+            result[(gan_name, var, itr)] = [0, detections, time.time()-start]
 
             # make samples
             exp._make_samples(params, itr=itr)

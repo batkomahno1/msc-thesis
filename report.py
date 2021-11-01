@@ -77,7 +77,7 @@ for metric, metric_id in metric_map.items():
         axs[0,1].set_title('fmnist'.upper()+'\n n='+str(max(iterations)+1))
         x, y = ([],[]), ([],[])
         for p in params_reduced:
-            if (not (isinstance(p,str) or opt.dp)) or (opt.dp and isinstance(p,str) and metric=='fid') or (opt.dp and not isinstance(p,str) and metric=='auc'):
+            if not isinstance(p,str):
                 d = p if isinstance(p,str) else p[2]
                 x_label = str(p[:2] + p[-2:]) if not isinstance(p,str) else 'clean'
                 x[idx_d(d)].append(x_label)
