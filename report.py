@@ -38,7 +38,7 @@ datasets = ['mnist', 'fmnist']
 
 iterations
 gans, iterations = [sorted(list(l)) for l in [gans, iterations]]
-
+# print(results)
 # accumulate data s.t. accum[gan, param] = fids, aucs
 accum = dict()
 for g in gans:
@@ -58,7 +58,6 @@ for g in gans:
                         accum[val][1]+=val2[1]
                     else:
                         accum[val]=val2
-
 var = list({v for _,v in accum.keys()})
 params_reduced = sorted(var, key = lambda v: (v,0,0,0) if isinstance(v, str) else (v[2],v[0],v[3],v[1]))
 
@@ -78,93 +77,14 @@ for metric, metric_id in metric_map.items():
         axs[0,1].set_title('fmnist'.upper()+'\n n='+str(max(iterations)+1))
         x, y = ([],[]), ([],[])
         for p in params_reduced:
-            if not isinstance(p,str) or not metric=='auc':
+            if (not (isinstance(p,str) or opt.dp)) or (opt.dp and isinstance(p,str) and metric=='fid') or (opt.dp and not isinstance(p,str) and metric=='auc'):
                 d = p if isinstance(p,str) else p[2]
                 x_label = str(p[:2] + p[-2:]) if not isinstance(p,str) else 'clean'
                 x[idx_d(d)].append(x_label)
                 y[idx_d(d)].append(accum[g,p][metric_id])
         for idx in [0,1]:
+            # print(x,y)
             axs[i, idx].boxplot(y[idx], labels=x[idx])
             # [tick.set_rotation(15) for tick in axs[i, idx].get_xticklabels()]
     plt.savefig('reports/'+source+'_'+metric+dp+'_report.png')
     plt.close()
-
-# if opt.dp:
-#     metric, metric_id = 'auc', metric_map['auc']
-#     fig, axs = plt.subplots(len(gans), 2, figsize=(10,10), sharex=False)
-#     if len(axs.shape) < 2:
-#         print('Reshaping axis...')
-#         axs.shape = 1,2
-#     fig.autofmt_xdate(rotation=45)
-#     idx_d = lambda d: 0 if d=='mnist' else 1
-#     for i, g in enumerate(gans):
-#         axs[i,0].set_ylabel(g.upper())
-#         axs[0,0].set_title('mnist'.upper()+'\n n='+str(max(iterations)+1))
-#         axs[0,1].set_title('fmnist'.upper()+'\n n='+str(max(iterations)+1))
-#         x, y = ([],[]), ([],[])
-#         for p in params_reduced:
-#             if not isinstance(p,str):
-#                 # x_label = str(p[:2] + p[-2:-1])
-#                 d = p[2]
-#                 x[idx_d(d)].append(p[-2])
-#                 y[idx_d(d)].append(accum[g,p][metric_id])
-#         for idx in [0,1]:
-#             print(len(y[idx]), len(x[idx]), y[idx])
-#             for idx_atk in range(2):
-#                 axs[i, idx].scatter([x[idx][idx_atk]]*len(y[idx][idx_atk]), y[idx][idx_atk])
-#                 axs[i, idx].scatter([x[idx][idx_atk]], mean(y[idx][idx_atk]), marker = 'D', color='r')
-#             # [tick.set_rotation(15) for tick in axs[i, idx].get_xticklabels()]
-#     plt.savefig('reports/'+source+'_'+metric+dp+'_outlier_report.png')
-#     plt.close()
-#
-# import pickle5 as pickle
-# with open('downloads_dp/experiment_results/results_dp.pkl', 'rb') as f:
-#     results = pickle.load(f)
-#
-# # get unique sets of params, iterations and gans
-# gans = set([v[0] for v in results.keys()])
-# params = set([v[1] for v in results.keys()])
-# iterations = set([v[-1] for v in results.keys()])
-# datasets = ['mnist', 'fmnist']
-#
-# iterations, gans, params
-#
-# import math
-# import matplotlib.pyplot as plt
-# for f in [0]:
-#     _, axs = plt.subplots(2,2,sharex=True,sharey=True,figsize=(10,10))
-#     for i, atk in enumerate(['low', 'norm']):
-#         for j, dataset in enumerate(datasets):
-#             p = (-1, 1, 20, 1.0, True, dataset, atk, 'earlyStop')
-#             for itr in iterations:
-#                 auc, fprs, tprs = results['dpwgan',p,itr][1][:3]
-#                 axs[j,i].plot(fprs, tprs, label=dataset+', auc='+str(round(auc,2)))
-#                 # axs[j,i].xlabel('FPR')
-#                 # plt.ylabel('TPR')
-#                 # plt.legend()
-#                 axs[j,i].set_title(f'{atk}:{dataset}')
-#     plt.show()
-# # plt.close()
-
-# iterations = 6
-#
-# low_auc_mnist = [v[1][0] for k,v in results.items() if 'low' in k[1] and 'mnist' in k[1]]
-# norm_auc_mnist = [v[1][0] for k,v in results.items() if 'norm' in k[1] and 'mnist' in k[1]]
-# low_auc_fmnist = [v[1][0] for k,v in results.items() if 'low' in k[1] and 'fmnist' in k[1]]
-# norm_auc_fmnist = [v[1][0] for k,v in results.items() if 'norm' in k[1] and 'fmnist' in k[1]]
-# # norm_auc = [v[1] for k,v in results.items() if 'norm' in k[1]]
-#
-# import matplotlib.pyplot as plt
-# plt.boxplot([low_auc_mnist, norm_auc_mnist])
-#
-# from math import *
-#
-# import statistics as stats
-# [stats.mean(v) for v in [low_auc_mnist, norm_auc_mnist]]
-# a,b = [stats.median(v) for v in [low_auc_fmnist, norm_auc_fmnist]]
-# a,b
-# (b-a)/a
-#
-# b/a*100-100
-# [1 for v in low_auc_fmnist if v > max(norm_auc_fmnist)]
-# plt.boxplot([low_auc_fmnist, norm_auc_fmnist])

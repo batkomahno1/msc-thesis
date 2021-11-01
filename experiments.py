@@ -98,7 +98,7 @@ class Experiment_DPWGAN(Experiment):
 
     def _load_raw_data(self, **kwargs):
         """Leave only classes zero and one. Easier to synthesize for DP WGAN!"""
-        super()._load_raw_data(kwargs)
+        super()._load_raw_data(**kwargs)
         self.classes = [0,1]
         idxs = torch.cat([torch.where(self.targets == tgt)[0].flatten() for tgt in self.classes])
         self.targets = self.targets[idxs]

@@ -458,7 +458,7 @@ class Experiment(abc.ABC):
 
         self._data_to_GPU()
         # Sample labels
-        if not isinstance(tgt_class, str) and tgt_class > 0 and tgt_class in self.classes:
+        if not isinstance(tgt_class, str) and tgt_class >= 0 and tgt_class in self.classes:
             labels = self.LongTensor(np.array([tgt_class]*nb_samples, dtype=np.int))
         else:
             labels = self.LongTensor(

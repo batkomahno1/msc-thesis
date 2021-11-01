@@ -154,6 +154,7 @@ for itr in range(iter_start, iter_start + ITERATIONS):
             logging.info(f'RUNNING EXP {gan_name} WITH {params} AT {itr}')
             if opt.verbose: print(gan_name, params, itr)
 
+            # TODO: move this somewhere
             # toggle DP sanitization
             exp.sigma, exp.weight_clip = 0.047, 0.1
 
@@ -162,22 +163,24 @@ for itr in range(iter_start, iter_start + ITERATIONS):
 
             # make clean gan
             fid_cln = exp.run_cln(dataset, itr=itr, download=opt.download)
+            result[(gan_name, dataset, itr)] = [fid_cln, time.time()-start]
 
             # make samples
             exp._make_samples(params, itr=itr)
 
-            # run detections
+            # run detections but ignoe FID scores for PSND gans
             detections = None
             # skip first iteration for lack of a second gan
             if itr > 0:
                 itr_other = np.random.choice([i for i in range(itr) if i!=itr], 1, replace=False)[0]
                 detections = exp.detect(params, itr=itr, download=opt.download, itr_other=itr_other)
+                result[(gan_name, params, itr)] = [0, detections, time.time()-start]
 
-                # catch up with the first iteration
-                if itr == 1:
-                    itr_other = itr
-                    detections_prev = exp.detect(params, itr=0, download=opt.download, itr_other=itr_other)
-                    result[(gan_name, dataset, 0)][1] = detections_prev
+            # catch up with the first iteration
+            if itr == 1:
+                itr_other = itr
+                detections_prev = exp.detect(params, itr=0, download=opt.download, itr_other=itr_other)
+                result[(gan_name, params, 0)] = [0, detections_prev, time.time()-start]
 
             # save the result
             result[(gan_name, dataset, itr)] = [fid_cln, detections, time.time()-start]
