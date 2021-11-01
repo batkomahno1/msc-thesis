@@ -3,7 +3,7 @@ TGT_EPOCHS=(1,)
 PCT=(20,)
 EPS=(1.0,) # try zero here
 TARGETED=(True,)
-ATK = ('dp',)
+ATK = ('dp','nondp')
 NOTE=('earlyStop',)
 
 # # select GANs to be tested

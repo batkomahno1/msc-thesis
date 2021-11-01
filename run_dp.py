@@ -155,7 +155,7 @@ for itr in range(iter_start, iter_start + ITERATIONS):
             if opt.verbose: print(gan_name, params, itr)
 
             # toggle DP sanitization
-            if params[-2] == 'dp'
+            if params[-2] == 'dp':
                 exp.sigma, exp.weight_clip = 0.047, 0.1
             else:
                 exp.sigma, exp.weight_clip = None, None
@@ -167,9 +167,11 @@ for itr in range(iter_start, iter_start + ITERATIONS):
             fid_cln = exp.run_cln(dataset, itr=itr, download=opt.download)
 
             # add the clean result bearing in mind that nonprivate gan might overwrite the private one or vice versa
-            var = copy.deepcopy(params)
+            var = list(copy.deepcopy(params))
             var[3] = 0.0
-            result[(gan_name, var, itr)] = [0, detections, time.time()-start]
+            var = tuple(var)
+            # put in a placeholder for detections
+            result[(gan_name, var, itr)] = [fid_cln, (-1,[],[],[]), time.time()-start]
 
             # make samples
             exp._make_samples(params, itr=itr)
@@ -180,7 +182,8 @@ for itr in range(iter_start, iter_start + ITERATIONS):
             if itr > 0:
                 itr_other = np.random.choice([i for i in range(itr) if i!=itr], 1, replace=False)[0]
                 detections = exp.detect(params, itr=itr, download=opt.download, itr_other=itr_other)
-                result[(gan_name, params, itr)] = [0, detections, time.time()-start]
+                # use a placeholder for fids
+                result[(gan_name, params, itr)] = [-1, detections, time.time()-start]
 
             # catch up with the first iteration
             if itr == 1:
