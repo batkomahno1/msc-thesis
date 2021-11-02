@@ -6,6 +6,7 @@ import logging
 import time
 import numpy as np
 from experiment import Experiment, _import_model, get_hyper_param, OUTPUT_ID
+import shutil
 
 class Experiment_ACGAN(Experiment):
     def __init__(self, **kwargs):
@@ -96,6 +97,7 @@ class Experiment_DPWGAN(Experiment):
     def _instantiate_D(self):
         return super()._instantiate_D()
 
+    # override this to reduce number of classes
     def _load_raw_data(self, **kwargs):
         """Leave only classes zero and one. Easier to synthesize for DP WGAN!"""
         super()._load_raw_data(**kwargs)
@@ -104,6 +106,15 @@ class Experiment_DPWGAN(Experiment):
         self.targets = self.targets[idxs]
         self.data = self.data[idxs]
 
+    # override to copy aside dp samples
+    def make_imgs(self, p, itr=0, nb_samples=2048):
+        super().make_imgs(p, itr=itr, nb_samples=nb_samples)
+        c, pct = get_hyper_param(p)
+        src = self.RESULTS+'PSND_FAKES_'+OUTPUT_ID.format(c, pct, itr)+'.png'
+        dst = self.RESULTS+'PSND_FAKES_'+OUTPUT_ID.format(c, pct, itr)+'_sigma_'+str(self.sigma)+'.png'
+        shutil.copyfile(src, dst)
+
+    # override to adopt differential privacy
     def _build_gan(self, p, itr=0, save=False):
         logging.info(f'Starting experiment: DPWGAN {p} iteration {itr}.')
         # TODO: use subprocess.check_output instead

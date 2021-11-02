@@ -159,7 +159,7 @@ class DPWGAN(object):
         torch.save(get_dict(self.discriminator), name_d)
         torch.save(get_dict(self.generator), name_g)
 
-        print('DPWGAN done.')
+        print('\nDPWGAN done.')
 
     def generate(self, n):
         """Generate a synthetic data set using the trained model

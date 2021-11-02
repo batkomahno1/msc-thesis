@@ -647,7 +647,11 @@ class Experiment(abc.ABC):
         return fid
 
     def detect(self, params, itr=0, download=False, itr_other=None):
-        """Returns auc, fprs, tprs, thetas of detection and produces a ROC curve."""
+        """
+        Returns auc, fprs, tprs, thetas of detection and produces a ROC curve.
+        For DP uses adv data created by a GAN from a different iteration.
+        Otherwise, the GAN might have been overwritten!
+        """
         if isinstance(params, str):
             raise ValueError('PSND GAN missing.')
 
@@ -677,20 +681,21 @@ class Experiment(abc.ABC):
         self._init_gan_models()
         if self.verbose: print('Models initialized')
 
-        # download psnd GAN
-        if download: self.download(params, itr=itr, epoch=self.EPOCHS-1)
-
-        # TODO: CHECK FOR ADV SAMPLES INSTEAD!!
-        # # check psnd GAN
-        # if not self.check_gan(params, itr=itr, epoch=self.EPOCHS-1):
-        #     raise ValueError('PSND GAN not found.')
+        # prepare a generator with an interface for whatever GAN arch I use
+        G0 = self._load_generator(dataset, 0, itr=itr).to(self.DEVICE)
+        # TODO: TEST THIS!!
+        if torch.cuda.device_count() > 1:
+            devices = [int(v) for v in os.environ["CUDA_VISIBLE_DEVICES"].replace(' ', '').split(',')]
+            if self.verbose: print('Running on GPUs: ', devices)
+            G0 = nn.DataParallel(G0, device_ids=devices)
+        G = self.G_decorator(G0)
 
         # get data with adv samples
-        X, y = [v.to(self.DEVICE) for v in self._load_adv_data(params, itr=itr)]
+        X, y = [v.to(self.DEVICE) for v in self._load_adv_data(params, itr=itr_other)]
 
         # get indecis of adv samples
         tgt_class, c, pct  = params[0], *get_hyper_param(params)
-        adv_idxs = torch.load(self.idxs_path.format(c, pct, itr))
+        adv_idxs = torch.load(self.idxs_path.format(c, pct, itr_other))
         # TODO: VERIFY VALIDITY OF CHOOSING A SUBSET
         nb_samples = min(len(adv_idxs), DETECTOR_SAMPLE_SIZE)
         adv_idxs = np.random.choice(adv_idxs, nb_samples, replace=False)
@@ -709,16 +714,6 @@ class Experiment(abc.ABC):
 
         # combine adv and cln idxs
         sel_idxs = np.sort(np.concatenate((cln_idxs,adv_idxs), axis=0))
-
-        # prepare a generator with an interface for whatever GAN arch I use
-        dataset = params[-3]
-        G0 = self._load_generator(dataset, 0, itr=itr).to(self.DEVICE)
-        # TODO: TEST THIS!!
-        if torch.cuda.device_count() > 1:
-            devices = [int(v) for v in os.environ["CUDA_VISIBLE_DEVICES"].replace(' ', '').split(',')]
-            if self.verbose: print('Running on GPUs: ', devices)
-            G0 = nn.DataParallel(G0, device_ids=devices)
-        G = self.G_decorator(G0)
 
         # set defgan params
         # TODO: make these class constants?
