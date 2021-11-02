@@ -199,6 +199,40 @@ class Experiment(abc.ABC):
 
         self.data, self.targets, self.classes = data, targets, classes
 
+    def _load_test_data(self, mean=0.5, std=0.5, dataset_name='mnist'):
+        # TODO: THIS RESIZING IS A PROBLEM!! FIX IT
+        if dataset_name=='mnist':
+            dataset = datasets.MNIST(
+                    '/tmp/test',
+                    train=False,
+                    download=True,
+                    transform=transforms.Compose([transforms.Resize(self.IMG_SHAPE[-1]),
+                                                    transforms.ToTensor(),
+                                                    transforms.Normalize([0.5], [0.5])
+                                                 ])
+            )
+        elif dataset_name=='fmnist':
+            dataset = datasets.FashionMNIST(
+                    '/tmp/test',
+                    train=False,
+                    download=True,
+                    transform=transforms.Compose([transforms.Resize(self.IMG_SHAPE[-1]),
+                                                    transforms.ToTensor(),
+                                                    transforms.Normalize([mean], [std])
+                                                 ])
+            )
+        else:
+            raise NotImplementedError
+
+        # TODO: pass dataloader directly to the GAN
+        dataloader = torch.utils.data.DataLoader(dataset, batch_size=dataset.__len__(), shuffle=False)
+        data, targets = next(iter(dataloader))
+
+        if not data.min().item()==-1 and data.max().item()==1:
+            raise ValueError('Data Not Clipped')
+
+        return data, targets
+
     def _data_to_CPU(self):
         self.data, self.targets = [v.detach().cpu() for v in [self.data, self.targets]]
 
@@ -703,6 +737,7 @@ class Experiment(abc.ABC):
         if not isinstance(adv_idxs,np.ndarray): raise TypeError('Wrong type: '+type(adv_idxs))
 
         # find indecis of clean samples
+        # TODO: IMPROVE THIS CHECK FOR TARGET CLASS
         if tgt_class == -1:
             cln_idxs = np.array(list(set(range(X.shape[0])) - set(adv_idxs)))
         else:
@@ -711,6 +746,14 @@ class Experiment(abc.ABC):
 
         # randomly select as many cln indecis as adv ones
         cln_idxs = np.random.choice(cln_idxs, len(adv_idxs), replace=False)
+
+        # SUBSTITUTE TESTING DATA
+        X_test, y_test = [v.to(self.DEVICE) for v in self._load_test_data(dataset_name=dataset)]
+        # find matching labels
+        # var = np.in1d(y[cln_idxs].cpu().numpy(), y_test.cpu().numpy()).nonzero()[0]
+        var = [torch.where(y_test==y[cln_idxs][i])[0][0].item() for i in range(cln_idxs.shape[0])]
+        assert all(y_test[var] == y[cln_idxs])
+        X[cln_idxs] = X_test[var].to(self.DEVICE)
 
         # combine adv and cln idxs
         sel_idxs = np.sort(np.concatenate((cln_idxs,adv_idxs), axis=0))
