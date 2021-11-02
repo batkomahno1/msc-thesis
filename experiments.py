@@ -98,20 +98,28 @@ class Experiment_DPWGAN(Experiment):
         return super()._instantiate_D()
 
     # override this to reduce number of classes
-    def _load_raw_data(self, **kwargs):
+    def _load_raw_data(self, mean=0.5, std=0.5, dataset_name='mnist'):
         """Leave only classes zero and one. Easier to synthesize for DP WGAN!"""
-        super()._load_raw_data(**kwargs)
+        # load all data
+        super()._load_raw_data(mean=mean, std=std, dataset_name=dataset_name)
+
+        # remove extra classes
         self.classes = [0,1]
         idxs = torch.cat([torch.where(self.targets == tgt)[0].flatten() for tgt in self.classes])
         self.targets = self.targets[idxs]
         self.data = self.data[idxs]
+
+        # save data
+        torch.save(self.data, self.data_path.format(dataset_name,0,0))
+        torch.save(self.targets, self.targets_path.format(dataset_name,0,0))
 
     # override to copy aside dp samples
     def make_imgs(self, p, itr=0, nb_samples=2048):
         super().make_imgs(p, itr=itr, nb_samples=nb_samples)
         c, pct = get_hyper_param(p)
         src = self.RESULTS+'PSND_FAKES_'+OUTPUT_ID.format(c, pct, itr)+'.png'
-        dst = self.RESULTS+'PSND_FAKES_'+OUTPUT_ID.format(c, pct, itr)+'_sigma_'+str(self.sigma)+'.png'
+        var = self.sigma is not None
+        dst = self.RESULTS+'PSND_FAKES_'+OUTPUT_ID.format(c, pct, itr)+'_dp_'+str(var)+'.png'
         shutil.copyfile(src, dst)
 
     # override to adopt differential privacy

@@ -451,7 +451,7 @@ class Experiment(abc.ABC):
         return self.gan_g_path.format(c,pct,itr,epoch)
 
     def make_imgs(self, p, itr=0, nb_samples=2048):
-        """Generate images and put them in /tmp/cln and /tmp/adv. Former are originals, later are fake."""
+        """Generate images and put them in tmp/cln and tmp/adv. Former are originals, later are fake."""
         c, pct = get_hyper_param(p)
         # TODO: hacky when clean GANs are considered
         tgt_class = p[0]
