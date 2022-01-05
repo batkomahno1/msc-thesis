@@ -1,7 +1,9 @@
 from os import listdir
+import sys
 from os.path import isfile, join
 import pickle5 as pickle
-from statistics import mean
+from statistics import mean, stdev
+from math import sqrt
 import argparse
 
 parser = argparse.ArgumentParser()
@@ -59,13 +61,14 @@ for g in gans:
                     else:
                         accum[val]=val2
 var = list({v for _,v in accum.keys()})
-params_reduced = sorted(var, key = lambda v: (v,0,0,0) if isinstance(v, str) else (v[2],v[0],v[3],v[1]))
+# print(var)
+params_reduced = sorted(var, key = lambda v: (v,0,0,0,0) if isinstance(v, str) else (v[2],v[0],v[3],v[1],v[4]))
 
 import matplotlib.pyplot as plt
 import numpy as np
 metric_map = {'fid':0, 'auc':1}
 for metric, metric_id in metric_map.items():
-    fig, axs = plt.subplots(len(gans), 2, figsize=(10,10), sharex=False)
+    fig, axs = plt.subplots(len(gans), 2, figsize=(10,10 if not opt.dp else 5), sharex=False)
     if len(axs.shape) < 2:
         print('Reshaping axis...')
         axs.shape = 1,2
@@ -78,14 +81,16 @@ for metric, metric_id in metric_map.items():
         x, y = ([],[]), ([],[])
         for p in params_reduced:
             # second condition filters out placeholders
-            if not isinstance(p,str) and max(accum[g,p][metric_id]) > 0:
+            # if not isinstance(p,str) and max(accum[g,p][metric_id]) > 0:
+            dp_skip = opt.dp and metric=='fid' and 'nondp' in p
+            if max(accum[g,p][metric_id]) > 0 and not dp_skip:
                 d = p if isinstance(p,str) else p[2]
                 x_label = str(p[:2] + p[-2:]) if not isinstance(p,str) else 'clean'
                 x[idx_d(d)].append(x_label)
                 y[idx_d(d)].append(accum[g,p][metric_id])
         for idx in [0,1]:
             # print(x,y)
-            axs[i, idx].boxplot(y[idx], labels=x[idx])
+            axs[i, idx].boxplot(y[idx], labels=x[idx], notch=True)
             # [tick.set_rotation(15) for tick in axs[i, idx].get_xticklabels()]
-    plt.savefig('reports/'+source+'_'+metric+dp+'_report.png')
+    plt.savefig('reports/'+source+'_'+metric+dp+'_report.png', bbox_inches="tight")
     plt.close()
