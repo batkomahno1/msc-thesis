@@ -15,14 +15,17 @@ from gan_archs.dpwgan import Discriminator
 ############### AD HOC APPROACH ################################
 from gan_archs.dpwgan import Discriminator
 epochs,M,m,n_d,delta,eps = 50, 6e3*2, 64/4, 5, 1e-5, 30
-
+6e3*2
+6e5/10
+1.2e4
 # bounds
 # https://ml-cheatsheet.readthedocs.io/en/latest/activation_functions.html#leakyrelu
 B_s = 1
 B_s_prime = 1/4
 
 D = Discriminator((1,28,28))
-
+D.parameters
+[p.flatten().shape[0] for p in D.parameters()]
 # skip the input layer per paper
 grads = [p.flatten().shape[0] for p in D.parameters()][2:]
 grad_sizes = [p.shape for p in D.parameters()][2:]
@@ -35,7 +38,11 @@ c_p = 1/(grad_sizes[0][0]*B_s_prime) #0.001
 c_p = min(0.1, c_p)
 c_p
 
+# c_p = 1/(grad_sizes[0][1]*B_s_prime) #0.001
+# c_p
+
 epoch_length = M / (n_d * m)
+epoch_length
 n_iters = int(epochs * epoch_length)
 n_iters # discriminator training
 n_d*n_iters # generator training

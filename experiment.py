@@ -749,6 +749,7 @@ class Experiment(abc.ABC):
 
         # SUBSTITUTE TESTING DATA
         X_test, y_test = [v.to(self.DEVICE) for v in self._load_test_data(dataset_name=dataset)]
+        assert y_test.shape[0]==1e4
         # find matching labels
         # var = np.in1d(y[cln_idxs].cpu().numpy(), y_test.cpu().numpy()).nonzero()[0]
         var = [torch.where(y_test==y[cln_idxs][i])[0][0].item() for i in range(cln_idxs.shape[0])]
