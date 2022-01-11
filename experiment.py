@@ -457,19 +457,46 @@ class Experiment(abc.ABC):
         tgt_class = p[0]
 
         self._data_to_GPU()
-        # Sample labels
+        # THIS IS NOT TESTED
+        # sample points for conditional archs
         if not isinstance(tgt_class, str) and tgt_class >= 0 and tgt_class in self.classes:
+            # make a tensor of identical labels
             labels = self.LongTensor(np.array([tgt_class]*nb_samples, dtype=np.int))
+            # find indecis of above labels in data
+            candidate_idxs = torch.where(self.targets==tgt_class)[0].detach().cpu().numpy()
+            # sample without replacment from data
+            idxs = np.random.choice(candidate_idxs, nb_samples, replace=False)
+        # sample points for unsupervised
         else:
-            labels = self.LongTensor(
-                [self.classes[np.random.randint(len(self.classes))] for i in range(nb_samples)]
-            )
+            # find a ceiling of number of samples
+            nb_classes = len(self.classes)
+            n = -(-nb_samples//nb_classes)
+            n_class = n//nb_classes
+            assert n_class*nb_classes == n
+            # initialize label and idxs tesnors
+            idxs = np.zeros(n, dtype = np.int)
+            labels = self.LongTensor(np.zeros(n, dtype = np.int))
+            # pick random points for each class
+            for i, cls in enumerate(self.classes):
+                # make a tensor of identical labels
+                labels[i*n_class, (i+1)*n_class] = self.LongTensor(np.array([cls]*n_class, dtype=np.int))
+                # find indecis of above labels in data
+                candidate_idxs = torch.where(self.targets==cls)[0].detach().cpu().numpy()
+                # sample without replacment from data
+                idxs[i*n_class, (i+1)*n_class] = np.random.choice(candidate_idxs, n_class, replace=False)
+            # remove extra samples`
+            labels, idxs = labels[:nb_samples], idxs[:nb_samples]
+            # shuffle
+            shuffle = np.random.choice(range(nb_samples), nb_samples, replace=False)
+            labels, idxs = labels[shuffle], idxs[shuffle]
+
+
         z_adv = self._generate(nb_samples, c, pct, itr=itr, labels = labels)
 
-        # pick first matching index in targets for each label
+        # sample random matching index with replacment in targets for each label
         # if no labels, then random picks
         matching = lambda e: torch.where(self.targets==e)[0]
-        idxs = [matching(e)[0].item() for e in labels if len(matching(e)) > 0]
+        idxs = [matching(e)[np.random.randint(0,len(matching(e)))].item() for e in labels if len(matching(e)) > 0]
 
         assert all(labels == self.targets[idxs])
         assert len(idxs) == labels.shape[0]
