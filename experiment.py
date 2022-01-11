@@ -468,22 +468,24 @@ class Experiment(abc.ABC):
             idxs = np.random.choice(candidate_idxs, nb_samples, replace=False)
         # sample points for unsupervised
         else:
-            # find a ceiling of number of samples
+            # get number of classes
             nb_classes = len(self.classes)
-            n = -(-nb_samples//nb_classes)
+            # find a ceiling of number of samples w.r.t number of classes
+            n = -(-nb_samples//nb_classes)*nb_classes
+            #get number of samples per class
             n_class = n//nb_classes
-            assert n_class*nb_classes == n
+            assert n_class*nb_classes == n, [n_class, nb_classes, n]
             # initialize label and idxs tesnors
             idxs = np.zeros(n, dtype = np.int)
             labels = self.LongTensor(np.zeros(n, dtype = np.int))
             # pick random points for each class
             for i, cls in enumerate(self.classes):
                 # make a tensor of identical labels
-                labels[i*n_class, (i+1)*n_class] = self.LongTensor(np.array([cls]*n_class, dtype=np.int))
+                labels[i*n_class:(i+1)*n_class] = self.LongTensor(np.array([cls]*n_class, dtype=np.int))
                 # find indecis of above labels in data
                 candidate_idxs = torch.where(self.targets==cls)[0].detach().cpu().numpy()
                 # sample without replacment from data
-                idxs[i*n_class, (i+1)*n_class] = np.random.choice(candidate_idxs, n_class, replace=False)
+                idxs[i*n_class:(i+1)*n_class] = np.random.choice(candidate_idxs, n_class, replace=False)
             # remove extra samples`
             labels, idxs = labels[:nb_samples], idxs[:nb_samples]
             # shuffle
@@ -514,7 +516,7 @@ class Experiment(abc.ABC):
 
         # don't need vars stored in GPU memory anymore, release them!
         self._data_to_CPU()
-        del z_adv, matching, idxs
+        del z_adv, labels, idxs
         torch.cuda.empty_cache()
 
     def _measure_FID(self, p, itr=0, nb_samples=2048):
