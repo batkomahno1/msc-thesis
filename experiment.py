@@ -490,13 +490,7 @@ class Experiment(abc.ABC):
             shuffle = np.random.choice(range(nb_samples), nb_samples, replace=False)
             labels, idxs = labels[shuffle], idxs[shuffle]
 
-
         z_adv = self._generate(nb_samples, c, pct, itr=itr, labels = labels)
-
-        # sample random matching index with replacment in targets for each label
-        # if no labels, then random picks
-        matching = lambda e: torch.where(self.targets==e)[0]
-        idxs = [matching(e)[np.random.randint(0,len(matching(e)))].item() for e in labels if len(matching(e)) > 0]
 
         assert all(labels == self.targets[idxs])
         assert len(idxs) == labels.shape[0]
