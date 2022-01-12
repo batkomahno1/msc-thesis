@@ -494,6 +494,7 @@ class Experiment(abc.ABC):
 
         z_adv = self._generate(nb_samples, c, pct, itr=itr, labels = labels)
 
+        assert len(idxs) == nb_samples
         assert all(labels == self.targets[idxs])
         assert len(idxs) == labels.shape[0]
 
@@ -738,6 +739,11 @@ class Experiment(abc.ABC):
         # combine adv and cln idxs
         sel_idxs = np.sort(np.concatenate((cln_idxs,adv_idxs), axis=0))
 
+        # shuffle selected indecis
+        chk = len(sel_idxs)
+        sel_idxs = np.random.choice(sel_idxs, len(sel_idxs), replace=False)
+        assert len(sel_idxs) == chk
+
         # set defgan params
         # TODO: make these class constants?
         learning_rate = 10.0
@@ -746,7 +752,6 @@ class Experiment(abc.ABC):
         loss = nn.MSELoss().to(self.DEVICE)
 
         # get a set of optimal z's
-        # TODO: DOUBLE CHECK DOING THIS IN ONE GO VS FOR EACH IMAGE SEPERATELY!!!!!
         z_hats = defense_gan.get_z_sets(G, X[sel_idxs], {'labels':y[sel_idxs]}, learning_rate, loss, \
                                         self.DEVICE, input_latent = self.LATENT_DIM)[-1].to(self.DEVICE)
 
@@ -755,10 +760,6 @@ class Experiment(abc.ABC):
 
         # find z* that minimizes losses in X
         with torch.no_grad():
-            # # possible memory issues, choose device
-            # device = self.DEVICE
-            # X, y, z_hats, loss = [v.to(device) for v in [X, y, z_hats, loss]]
-
             # get losses for different z's
             losses = torch.Tensor([loss(G(z, {'labels':y[sel_idxs]}), X[sel_idxs]).cpu() for z in z_hats])
 
@@ -766,9 +767,8 @@ class Experiment(abc.ABC):
             min_idx = torch.argmin(losses).cpu().item()
 
             # calculate MSE for each image vs z*
-            # TODO: speed this up with matrix operations
             A, B = G(z_hats[min_idx], {'labels':y[sel_idxs]}).squeeze(), X[sel_idxs].squeeze()
-            img_losses = torch.Tensor([loss(A[i], B[i]).cpu().item() for i in range(len(A))])
+            img_losses=(A.view(-1,A.shape[-1]*A.shape[-2])-B.view(-1,B.shape[-1]*B.shape[-2])).pow(2).mean(axis=1)
 
             # normalize losses
             losses /= losses.max()
@@ -788,7 +788,7 @@ class Experiment(abc.ABC):
             assert all(y_pred.shape==y_true.shape for y_pred in y_preds)
 
             # clean up memory
-            del X, y, z_hats, loss
+            del X, y, z_hats, loss, A, B
             torch.cuda.empty_cache()
 
         # get confusion matrices for each theta

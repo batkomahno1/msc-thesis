@@ -27,7 +27,8 @@ TARGETED=(True,)
 ATK = ('inf',)
 NOTE=('earlyStop',)
 # select GANs to be tested
-GAN_CHOICE = ['wgan_gp', 'cgan']
+# GAN_CHOICE = ['wgan_gp', 'cgan']
+GAN_CHOICE = ['wgan', 'wgan_gp', 'cgan', 'acgan']
 # gan name : epochs, batch size
 GAN_SETTINGS = {
 'acgan':(50,64),
