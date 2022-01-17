@@ -457,20 +457,44 @@ class Experiment(abc.ABC):
         tgt_class = p[0]
 
         self._data_to_GPU()
-        # Sample labels
+        # THIS IS NOT TESTED
+        # sample points for conditional archs
         if not isinstance(tgt_class, str) and tgt_class >= 0 and tgt_class in self.classes:
+            # make a tensor of identical labels
             labels = self.LongTensor(np.array([tgt_class]*nb_samples, dtype=np.int))
+            # find indecis of above labels in data
+            candidate_idxs = torch.where(self.targets==tgt_class)[0].detach().cpu().numpy()
+            # sample without replacment from data
+            idxs = np.random.choice(candidate_idxs, nb_samples, replace=False)
+        # sample points for unsupervised
         else:
-            labels = self.LongTensor(
-                [self.classes[np.random.randint(len(self.classes))] for i in range(nb_samples)]
-            )
+            # get number of classes
+            nb_classes = len(self.classes)
+            # find a ceiling of number of samples w.r.t number of classes
+            n = -(-nb_samples//nb_classes)*nb_classes
+            #get number of samples per class
+            n_class = n//nb_classes
+            assert n_class*nb_classes == n, [n_class, nb_classes, n]
+            # initialize label and idxs tesnors
+            idxs = np.zeros(n, dtype = np.int)
+            labels = self.LongTensor(np.zeros(n, dtype = np.int))
+            # pick random points for each class
+            for i, cls in enumerate(self.classes):
+                # make a tensor of identical labels
+                labels[i*n_class:(i+1)*n_class] = self.LongTensor(np.array([cls]*n_class, dtype=np.int))
+                # find indecis of above labels in data
+                candidate_idxs = torch.where(self.targets==cls)[0].detach().cpu().numpy()
+                # sample without replacment from data
+                idxs[i*n_class:(i+1)*n_class] = np.random.choice(candidate_idxs, n_class, replace=False)
+            # remove extra samples`
+            labels, idxs = labels[:nb_samples], idxs[:nb_samples]
+            # shuffle
+            shuffle = np.random.choice(range(nb_samples), nb_samples, replace=False)
+            labels, idxs = labels[shuffle], idxs[shuffle]
+
         z_adv = self._generate(nb_samples, c, pct, itr=itr, labels = labels)
 
-        # pick first matching index in targets for each label
-        # if no labels, then random picks
-        matching = lambda e: torch.where(self.targets==e)[0]
-        idxs = [matching(e)[0].item() for e in labels if len(matching(e)) > 0]
-
+        assert len(idxs) == nb_samples
         assert all(labels == self.targets[idxs])
         assert len(idxs) == labels.shape[0]
 
@@ -493,7 +517,7 @@ class Experiment(abc.ABC):
 
         # don't need vars stored in GPU memory anymore, release them!
         self._data_to_CPU()
-        del z_adv, matching, idxs
+        del z_adv, labels, idxs
         torch.cuda.empty_cache()
 
     def _measure_FID(self, p, itr=0, nb_samples=2048):
@@ -715,6 +739,11 @@ class Experiment(abc.ABC):
         # combine adv and cln idxs
         sel_idxs = np.sort(np.concatenate((cln_idxs,adv_idxs), axis=0))
 
+        # shuffle selected indecis
+        chk = len(sel_idxs)
+        sel_idxs = np.random.choice(sel_idxs, len(sel_idxs), replace=False)
+        assert len(sel_idxs) == chk
+
         # set defgan params
         # TODO: make these class constants?
         learning_rate = 10.0
@@ -723,7 +752,6 @@ class Experiment(abc.ABC):
         loss = nn.MSELoss().to(self.DEVICE)
 
         # get a set of optimal z's
-        # TODO: DOUBLE CHECK DOING THIS IN ONE GO VS FOR EACH IMAGE SEPERATELY!!!!!
         z_hats = defense_gan.get_z_sets(G, X[sel_idxs], {'labels':y[sel_idxs]}, learning_rate, loss, \
                                         self.DEVICE, input_latent = self.LATENT_DIM)[-1].to(self.DEVICE)
 
@@ -732,10 +760,6 @@ class Experiment(abc.ABC):
 
         # find z* that minimizes losses in X
         with torch.no_grad():
-            # # possible memory issues, choose device
-            # device = self.DEVICE
-            # X, y, z_hats, loss = [v.to(device) for v in [X, y, z_hats, loss]]
-
             # get losses for different z's
             losses = torch.Tensor([loss(G(z, {'labels':y[sel_idxs]}), X[sel_idxs]).cpu() for z in z_hats])
 
@@ -743,9 +767,8 @@ class Experiment(abc.ABC):
             min_idx = torch.argmin(losses).cpu().item()
 
             # calculate MSE for each image vs z*
-            # TODO: speed this up with matrix operations
             A, B = G(z_hats[min_idx], {'labels':y[sel_idxs]}).squeeze(), X[sel_idxs].squeeze()
-            img_losses = torch.Tensor([loss(A[i], B[i]).cpu().item() for i in range(len(A))])
+            img_losses=(A.view(-1,A.shape[-1]*A.shape[-2])-B.view(-1,B.shape[-1]*B.shape[-2])).pow(2).mean(axis=1)
 
             # normalize losses
             losses /= losses.max()
@@ -765,7 +788,7 @@ class Experiment(abc.ABC):
             assert all(y_pred.shape==y_true.shape for y_pred in y_preds)
 
             # clean up memory
-            del X, y, z_hats, loss
+            del X, y, z_hats, loss, A, B
             torch.cuda.empty_cache()
 
         # get confusion matrices for each theta
