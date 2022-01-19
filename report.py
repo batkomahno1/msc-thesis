@@ -82,7 +82,7 @@ for metric, metric_id in metric_map.items():
         for p in params_reduced:
             # second condition filters out placeholders
             # if not isinstance(p,str) and max(accum[g,p][metric_id]) > 0:
-            dp_skip = opt.dp and metric=='fid' and 'nondp' in p
+            dp_skip = opt.dp and metric=='fid' and isinstance(p,str)
             if max(accum[g,p][metric_id]) > 0 and not dp_skip:
                 d = p if isinstance(p,str) else p[2]
                 x_label = str(p[:2] + p[-2:]) if not isinstance(p,str) else 'clean'
