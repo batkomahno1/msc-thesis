@@ -97,6 +97,7 @@ for metric, metric_id in metric_map.items():
                     text = round(median(y[idx][ii]))
                     axs[i, idx].annotate(text, xy=(x_coord, y_coord))
     plt.savefig('reports/'+source+'_'+metric+dp+'_report.png', bbox_inches="tight")
+    plt.savefig('reports/'+source+'_'+metric+dp+'_report.svg', bbox_inches="tight")
     plt.close()
 
 # GENERATE POST-FILTERING FIDS
@@ -185,4 +186,5 @@ for i, g in enumerate(gans):
             axs[i, idx].annotate(text, xy=(x_coord, y_coord))
         # [tick.set_rotation(15) for tick in axs[i, idx].get_xticklabels()]
 plt.savefig('reports/'+source+'_'+metric+dp+'_report_filtered.png', bbox_inches="tight")
+plt.savefig('reports/'+source+'_'+metric+dp+'_report_filtered.svg', bbox_inches="tight")
 plt.close()
