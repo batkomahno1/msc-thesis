@@ -2,7 +2,7 @@ from os import listdir
 import sys
 from os.path import isfile, join
 import pickle5 as pickle
-from statistics import mean, stdev
+from statistics import mean, stdev, median
 from math import sqrt
 import argparse
 
@@ -89,9 +89,13 @@ for metric, metric_id in metric_map.items():
                 x[idx_d(d)].append(x_label)
                 y[idx_d(d)].append(accum[g,p][metric_id])
         for idx in [0,1]:
-            # print(x,y)
-            axs[i, idx].boxplot(y[idx], labels=x[idx], notch=True)
-            # [tick.set_rotation(15) for tick in axs[i, idx].get_xticklabels()]
+            nb = axs[i, idx].boxplot(y[idx], labels=x[idx], notch=True)
+            # print(nb.keys())
+            if metric=='fid':
+                for ii, line in enumerate(nb['boxes']):
+                    x_coord, y_coord = line.get_xydata()[1]
+                    text = round(median(y[idx][ii]))
+                    axs[i, idx].annotate(text, xy=(x_coord, y_coord))
     plt.savefig('reports/'+source+'_'+metric+dp+'_report.png', bbox_inches="tight")
     plt.close()
 
@@ -110,15 +114,15 @@ for k in results.keys():
             x=fpr[np.where((fpr<=0.3) & (fpr>=0.2))[0]]
             z = np.polyfit(x, y, 1)
             f = np.poly1d(z)
-            my_tpr = f(0.3).round(2).clip(0,1)
+            my_tpr = f(0.3).round(2).clip(0,2)
             # print(k, )
             p = k[1]
             tpr_list[k[0],(p[2], p[3], p[5], 'inf', p[7])] = my_tpr
     else:
         tpr_list[k[0],k[1]] = 1.0
-tpr_list
+
+
 # project fid differences
-from statistics import median
 params_reduced=np.array(params_reduced)
 idxs_es = np.array([0,3,6])
 idxs_dg = np.array([0,2,5])
@@ -132,13 +136,14 @@ for g in gans:
             medians = []
             for p in params_reduced[idxs_dict[dc]+i*7]:
                 medians.append(median(accum[g,p][0]))
-            z = np.polyfit([0,10,20], np.array(medians), 1)
+            z = np.polyfit([0,10,20], np.array(medians), 2)
             for p in params_reduced[idxs_dict[dc]+i*7]:
                 calc_fid[(g,p)] = np.poly1d(z)
 calc_fid['wgan_gp',(10, 1.0, 'mnist', 'inf', 'downgrade')](10)
 tpr_list['wgan_gp',(10, 1.0, 'mnist', 'inf', 'downgrade')]
 # median(accum['wgan_gp',(10, 1.0, 'mnist', 'inf', 'earlyStop')][0])-median(accum['wgan_gp','mnist'][0])
-calc_fid.keys()
+# calc_fid.keys()
+
 import matplotlib.pyplot as plt
 import numpy as np
 metric_map = {'fid':0, 'auc':1}
@@ -160,7 +165,7 @@ for i, g in enumerate(gans):
         dp_skip = False#opt.dp and metric=='fid' and isinstance(p,str)
         if max(accum[g,p][metric_id]) > 0 and not dp_skip:
             d = p if isinstance(p,str) else p[2]
-            x_label = str(p[:2] + p[-2:]) if not isinstance(p,str) else 'clean'
+            x_label = str(p[:2] + p[-1:]+(round(tpr_list[g,p],2),)) if not isinstance(p,str) else 'clean'
             x[idx_d(d)].append(x_label)
             if isinstance(p, str):
                 y[idx_d(d)].append(accum[g,p][metric_id])
@@ -172,10 +177,12 @@ for i, g in enumerate(gans):
             # diff = (np.array(accum[g,p][metric_id])-fid_cln)*(1-tpr_list[g,p])
             # y[idx_d(d)].append(fid_cln+diff)
     for idx in [0,1]:
-        # print(x,y)
-        axs[i, idx].boxplot(y[idx], labels=x[idx], notch=True)
+        nb = axs[i, idx].boxplot(y[idx], labels=x[idx], notch=True)
+        # print(nb.keys())
+        for ii, line in enumerate(nb['boxes']):
+            x_coord, y_coord = line.get_xydata()[1]
+            text = round(median(y[idx][ii]))
+            axs[i, idx].annotate(text, xy=(x_coord, y_coord))
         # [tick.set_rotation(15) for tick in axs[i, idx].get_xticklabels()]
 plt.savefig('reports/'+source+'_'+metric+dp+'_report_filtered.png', bbox_inches="tight")
 plt.close()
-
-params_reduced
