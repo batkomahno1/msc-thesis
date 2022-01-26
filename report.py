@@ -115,7 +115,7 @@ for k in results.keys():
             x=fpr[np.where((fpr<=0.3) & (fpr>=0.15))[0]]
             z = np.polyfit(x, y, 1)
             f = np.poly1d(z)
-            # f = lambda x: y.round(2).clip(0,1).max()
+            f = lambda x: y.round(2).clip(0,1).max()
             my_tpr = f(0.3).round(2).clip(0,1)
             # print(k, )
             p = k[1]
