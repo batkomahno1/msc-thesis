@@ -107,20 +107,28 @@ if opt.dp: sys.exit()
 # linearluy project tpr at 30% fpr
 tpr_list = {}
 for k in results.keys():
-    if not isinstance(k[1], str):# and k[1][3]>0:
+    if not isinstance(k[1], str):# and k[-1]==42:# and k[1][3]>0:
         fpr, tpr = [np.array(v) for v in [results[k][1][1], results[k][1][2]]]
         if len(tpr)>0 and len(fpr)>0:
             # print(tpr[np.where((fpr<=0.3) & (fpr>=0.2))[0]].max(), fpr[np.where((fpr<=0.3) & (fpr>=0.2))[0]].max())
-            y=tpr[np.where((fpr<=0.3) & (fpr>=0.2))[0]]
-            x=fpr[np.where((fpr<=0.3) & (fpr>=0.2))[0]]
+            y=tpr[np.where((fpr<=0.3) & (fpr>=0.15))[0]]
+            x=fpr[np.where((fpr<=0.3) & (fpr>=0.15))[0]]
             z = np.polyfit(x, y, 1)
             f = np.poly1d(z)
+            # f = lambda x: y.round(2).clip(0,1).max()
             my_tpr = f(0.3).round(2).clip(0,1)
             # print(k, )
             p = k[1]
-            tpr_list[k[0],(p[2], p[3], p[5], 'inf', p[7])] = my_tpr
+            print(k[0],p, my_tpr)
+            temp = k[0],(p[2], p[3], p[5], 'inf', p[7])
+            if temp in tpr_list.keys():
+                tpr_list[temp].append(my_tpr)
+            else:
+                tpr_list[temp] = [my_tpr]
     else:
-        tpr_list[k[0],k[1]] = 1.0
+        tpr_list[k[0],k[1]] = [1.0]
+
+tpr_list = {k:mean(v) for k,v in tpr_list.items()}
 
 
 # project fid differences
@@ -137,12 +145,12 @@ for g in gans:
             medians = []
             for p in params_reduced[idxs_dict[dc]+i*7]:
                 medians.append(median(accum[g,p][0]))
-            z = np.polyfit([0,10,20], np.array(medians), 2)
+            z = np.polyfit([0,10,20], np.array(medians), 1)
             for p in params_reduced[idxs_dict[dc]+i*7]:
                 calc_fid[(g,p)] = np.poly1d(z)
 calc_fid['wgan_gp',(10, 1.0, 'mnist', 'inf', 'downgrade')](10)
 tpr_list['wgan_gp',(10, 1.0, 'mnist', 'inf', 'downgrade')]
-# median(accum['wgan_gp',(10, 1.0, 'mnist', 'inf', 'earlyStop')][0])-median(accum['wgan_gp','mnist'][0])
+median(accum['wgan_gp',(10, 1.0, 'mnist', 'inf', 'earlyStop')][0])
 # calc_fid.keys()
 
 import matplotlib.pyplot as plt
@@ -160,6 +168,7 @@ for i, g in enumerate(gans):
     axs[0,0].set_title('mnist'.upper()+'\n n='+str(max(iterations)+1))
     axs[0,1].set_title('fmnist'.upper()+'\n n='+str(max(iterations)+1))
     x, y = ([],[]), ([],[])
+    params_used=([],[])
     for p in params_reduced:
         # second condition filters out placeholders
         # if not isinstance(p,str) and max(accum[g,p][metric_id]) > 0:
@@ -168,11 +177,14 @@ for i, g in enumerate(gans):
             d = p if isinstance(p,str) else p[2]
             x_label = str(p[:2] + p[-1:]) if not isinstance(p,str) else 'clean'
             x[idx_d(d)].append(x_label)
+            params_used[idx_d(d)].append(p)
             if isinstance(p, str):
                 y[idx_d(d)].append(accum[g,p][metric_id])
             else:
                 new_pct = (1-tpr_list[g,p])*p[0]
+                # print('>', g,p, tpr_list[g,p], new_pct)
                 temp = np.array(accum[g,p][metric_id])*calc_fid[g,p](new_pct)/median(accum[g,p][metric_id])
+                # temp = [calc_fid[g,p](new_pct)]
                 y[idx_d(d)].append(temp)
             # fid_cln = median(accum[g,d][metric_id])
             # diff = (np.array(accum[g,p][metric_id])-fid_cln)*(1-tpr_list[g,p])
@@ -182,9 +194,18 @@ for i, g in enumerate(gans):
         # print(nb.keys())
         for ii, line in enumerate(nb['boxes']):
             x_coord, y_coord = line.get_xydata()[1]
-            text = '{:d}\n{:.2f}'.format(round(median(y[idx][ii])), round(tpr_list[g,p],2))
+            p = params_used[idx][ii]
+            # print(x[idx][ii], p, tpr_list[g,p])
+            # print('>', g,p, tpr_list[g,p])
+            text = '{:d}\n{:.2f}'.format(round(median(y[idx][ii])), tpr_list[g,p],2)
             axs[i, idx].annotate(text, xy=(x_coord, y_coord),fontsize=8)
         # [tick.set_rotation(15) for tick in axs[i, idx].get_xticklabels()]
 plt.savefig('reports/'+source+'_'+metric+dp+'_report_filtered.png', bbox_inches="tight")
 plt.savefig('reports/'+source+'_'+metric+dp+'_report_filtered.svg', bbox_inches="tight")
 plt.close()
+
+x,y, = (0,10,20), (63,99,129)
+import numpy as np
+f = np.poly1d(np.polyfit(x,y,1))
+f(x)
+f(6.4)
