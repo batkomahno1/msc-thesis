@@ -14,7 +14,7 @@ from gan_archs.dpwgan import Discriminator
 
 ############### AD HOC APPROACH ################################
 from gan_archs.dpwgan import Discriminator
-epochs,M,m,n_d,delta,eps = 50, 6e3*2, 64/4, 5, 1e-5, 30
+epochs,M,m,n_d,delta,eps = 50, 6e3*2, 64/4, 5, 1e-5, 20
 
 # bounds
 # https://ml-cheatsheet.readthedocs.io/en/latest/activation_functions.html#leakyrelu
@@ -22,17 +22,30 @@ B_s = 1
 B_s_prime = 1/4
 
 D = Discriminator((1,28,28))
+D
+784*32, 32*16
 
+[p.flatten().size() for p in D.parameters()]
+[p.size()[0] for p in D.parameters()]
+
+[p.shape[0] for p in D.parameters()]
 # skip the input layer per paper
-grads = [p.flatten().shape[0] for p in D.parameters()][2:]
-grad_sizes = [p.shape for p in D.parameters()][2:]
+grads = [p.flatten().shape[0] for p in D.parameters()][1:][:-1]
+grads
+grad_sizes = [p.shape[0] for p in D.parameters()][1:]#[:-1]
 grad_sizes
+
+# grads = [32,16]
+# grads.append(1)
+# grads
 
 num_grads = sum(grads) #(512*256)
 num_grads
-
-c_p = 1/(grad_sizes[0][0]*B_s_prime) #0.001
-c_p = min(0.1, c_p)
+1/64
+c_p = 1/(max(grad_sizes)*B_s_prime) #0.001
+c_p
+c_p = min(0.01, c_p)
+c_p
 c_p
 
 epoch_length = M / (n_d * m)
@@ -54,35 +67,35 @@ sigma_n, c_g
 sd = sigma/m
 sd, c_p
 
-x_axis = np.linspace(-c_p, c_p, n_iters)
-samples=[norm.rvs(loc=0,scale=sd) for i in range(n_iters)]
-sns.displot(samples, stat='probability')
-
-
-###########CHECK IMAGES AT EACH EPOCH###########
-from config_test_dp import *
-from experiments import Experiment_DPWGAN
-name='dpwgan'
-dataset = 'mnist'
-dp = Experiment_DPWGAN(epochs = GAN_SETTINGS[name][0], batch_size=GAN_SETTINGS[name][1], \
-                verbose=True, device=0)
-dp._load_raw_data(dataset_name = 'mnist')
-dp._init_gan_models()
-from torchvision.utils import save_image
-
-import time
-for e in range(epochs):
-    time.sleep(1)
-    try:
-        imgs = dp._generate(100, dataset, 0, itr=0, epoch=e, labels=None).cpu().detach().clone().squeeze(0)
-        img_name='/tmp/imgs.png'
-        save_image(imgs, img_name, nrow=10, normalize=True)
-        from PIL import Image
-        import matplotlib.pyplot as plt
-        img = Image.open(img_name)
-        plt.imshow(img)
-        plt.axis('off')
-        plt.title('epoch '+str(e))
-        plt.show()
-    except Exception:
-        pass
+# x_axis = np.linspace(-c_p, c_p, n_iters)
+# samples=[norm.rvs(loc=0,scale=sd) for i in range(n_iters)]
+# sns.displot(samples, stat='probability')
+#
+#
+# ###########CHECK IMAGES AT EACH EPOCH###########
+# from config_test_dp import *
+# from experiments import Experiment_DPWGAN
+# name='dpwgan'
+# dataset = 'mnist'
+# dp = Experiment_DPWGAN(epochs = GAN_SETTINGS[name][0], batch_size=GAN_SETTINGS[name][1], \
+#                 verbose=True, device=0)
+# dp._load_raw_data(dataset_name = 'mnist')
+# dp._init_gan_models()
+# from torchvision.utils import save_image
+#
+# import time
+# for e in range(epochs):
+#     time.sleep(1)
+#     try:
+#         imgs = dp._generate(100, dataset, 0, itr=0, epoch=e, labels=None).cpu().detach().clone().squeeze(0)
+#         img_name='/tmp/imgs.png'
+#         save_image(imgs, img_name, nrow=10, normalize=True)
+#         from PIL import Image
+#         import matplotlib.pyplot as plt
+#         img = Image.open(img_name)
+#         plt.imshow(img)
+#         plt.axis('off')
+#         plt.title('epoch '+str(e))
+#         plt.show()
+#     except Exception:
+#         pass

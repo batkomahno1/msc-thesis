@@ -2,7 +2,7 @@
 # IF USING MORE THAN ONE PERCENTAGE OR EPSILON, CLEAN GAN WILL NOT BE RECALCULATED!!!!!!!!!
 DATASET=('mnist','fmnist',)
 TGT_EPOCHS=(1,)
-PCT=(20,)
+PCT=(10,)
 EPS=(1.0,)
 TARGETED=(True,)
 ATK = ('dp','nondp',)
