@@ -1,6 +1,6 @@
-DATASET=('mnist','fmnist',)
+DATASET=('mnist',)#'fmnist',)
 TGT_EPOCHS=(1,)
-PCT=(20,)
+PCT=(10,)
 EPS=(1.0,) # try zero here
 TARGETED=(True,)
 ATK = ('dp','nondp')
@@ -25,8 +25,9 @@ GAN_SETTINGS = {
 'cgan':(100,500),
 'wgan_gp':(50,250),
 'wgan':(100,500//8),
-# 'dpwgan':(50,64//4),
-'dpwgan':(5,128),
+'dpwgan':(50,64//4),
+# 'dpwgan':(5,128),
 }
 
 1*5*4
+64/4

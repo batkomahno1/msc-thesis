@@ -88,12 +88,15 @@ class Discriminator(nn.Module):
 
         self.model = nn.Sequential(
             # https://stackoverflow.com/questions/32514502/neural-networks-what-does-the-input-layer-consist-of
-            nn.Linear(int(np.prod(self.IMG_SHAPE)), 64), # hidden layer 1
+            nn.Linear(int(np.prod(self.IMG_SHAPE)), 64, bias=False), # hidden layer 1
+            # nn.Sigmoid(),
+            # nn.Linear(64, 16, bias=False), # hidden layer 2
             nn.Sigmoid(),
+
             # nn.LeakyReLU(0.2, inplace=True),
             # nn.Linear(64, 32), # hidden layer 2
             # nn.Sigmoid(),
-            # # nn.LeakyReLU(0.2, inplace=True),
+            # nn.LeakyReLU(0.2, inplace=True),
             nn.Linear(64, 1), # output layer
         )
 

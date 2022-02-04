@@ -156,7 +156,8 @@ for itr in range(iter_start, iter_start + ITERATIONS):
 
             # toggle DP sanitization
             if params[-2] == 'dp':
-                exp.sigma, exp.weight_clip = 0.047, 0.1
+                # exp.sigma, exp.weight_clip = 0.096, 0.1
+                exp.sigma, exp.weight_clip = 0.007, 0.01
             else:
                 exp.sigma, exp.weight_clip = None, None
 

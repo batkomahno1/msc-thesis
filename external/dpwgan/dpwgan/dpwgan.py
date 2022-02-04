@@ -80,7 +80,7 @@ class DPWGAN(object):
         # default meta-hook
         if meta_hook is None:
             meta_hook = lambda batch_size, sigma, paramter: \
-                            lambda grad: grad + (1 / batch_size**1) * sigma * torch.randn(parameter.shape).to(data.device)
+                            lambda grad: grad + (1 / batch_size) * sigma * torch.randn(parameter.shape).to(data.device)
                             # lambda grad: torch.clamp(grad, -cg, cg) + (1 / batch_size**2) * sigma * torch.randn(parameter.shape).to(data.device)
 
         if weight_clip is None:
