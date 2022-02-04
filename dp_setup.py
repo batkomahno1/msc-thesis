@@ -29,7 +29,7 @@ D
 [p.size()[0] for p in D.parameters()]
 
 [p.shape[0] for p in D.parameters()]
-# skip the input layer per paper
+# skip the input layer per paper and the output
 grads = [p.flatten().shape[0] for p in D.parameters()][1:][:-1]
 grads
 grad_sizes = [p.shape[0] for p in D.parameters()][1:]#[:-1]
@@ -54,6 +54,7 @@ n_iters # discriminator training
 n_d*n_iters # generator training
 
 # TODO: I have doubts about this calculation!! Can I multiply n_d by n_iters to get total epsilon?
+# skip the input layer per paper and the output
 sigma_n_formula = lambda eps: 2*m/M*sqrt(n_d*n_iters*log(1/delta))/eps
 sigma_n = sigma_n_formula(eps)
 c_g = 2*c_p*B_s*(B_s_prime**2)*num_grads
