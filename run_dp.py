@@ -167,7 +167,8 @@ for itr in range(iter_start, iter_start + ITERATIONS):
             # make clean gan
             fid_cln = exp.run_cln(dataset, itr=itr, download=opt.download)
 
-            # add the clean result bearing in mind that nonprivate gan might overwrite the private one or vice versa
+            # add the clean result bearing in mind that nonprivate gan will overwrite the private one and vice versa
+            # TODO: FORGOT TO SET THE PCT TO ZERO!!! Results with pgd of 0.0 will have 0 decoys with current params!
             var = list(copy.deepcopy(params))
             var[3] = 0.0
             var = tuple(var)
@@ -193,6 +194,7 @@ for itr in range(iter_start, iter_start + ITERATIONS):
                 result[(gan_name, params, 0)] = [0, detections_prev, time.time()-start]
 
             # save the result
+            # TODO: clean dp and non-dp gans overwrite each other!!
             result[(gan_name, dataset, itr)] = [fid_cln, detections, time.time()-start]
             logging.info(f'DONE.')
 

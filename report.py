@@ -82,10 +82,15 @@ for metric, metric_id in metric_map.items():
         for p in params_reduced:
             # second condition filters out placeholders
             # if not isinstance(p,str) and max(accum[g,p][metric_id]) > 0:
-            dp_skip = opt.dp and metric=='fid' and isinstance(p,str)
+            dp_skip = opt.dp and isinstance(p,str)
             if max(accum[g,p][metric_id]) > 0 and not dp_skip:
                 d = p if isinstance(p,str) else p[2]
-                x_label = str(p[:2] + p[-2:]) if not isinstance(p,str) else 'clean'
+                # only display whether the gans is dp for the private part b/c testing one set of params
+                # AUCs test psnd samples and FIDs test only clean gans (dp vs nondp)
+                if not opt.dp:
+                    x_label = str(p[:2] + p[-2:]) if not isinstance(p,str) else 'clean'
+                else:
+                    x_label = p[-2] if not isinstance(p,str) else 'clean'
                 x[idx_d(d)].append(x_label)
                 y[idx_d(d)].append(accum[g,p][metric_id])
         for idx in [0,1]:
