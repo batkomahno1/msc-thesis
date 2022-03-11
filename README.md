@@ -1,4 +1,11 @@
 # MSc Thesis
+This is the code and paper for my master's thesis. The biggest project I've done to date.
+
+## Refer to:
+```
+thesis.pdf
+```
+
 
 ## Setup
 ```
