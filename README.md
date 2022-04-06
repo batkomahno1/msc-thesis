@@ -1,5 +1,5 @@
 # MSc Thesis
-This is the code and paper for my master's thesis. The biggest project I've done to date.
+This is the code and paper for my master's thesis.
 
 ## Refer to:
 ```
